@@ -26,3 +26,4 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 BROWSER_AUTH_FILE = str(DATA_DIR / "browser.json")
 SPOTIFY_TOKEN_CACHE_FILE = str(DATA_DIR / ".cache")
+TRACK_CACHE_FILE = str(DATA_DIR / "track_cache.json")
