@@ -1,7 +1,8 @@
 """Migration orchestrator. Emits events; does not print directly."""
 import time
+from pathlib import Path
 
-from spotify_to_ytmusic.core.config import YTMUSIC_SEARCH_DELAY_S
+from spotify_to_ytmusic.core.config import TRACK_CACHE_FILE, YTMUSIC_SEARCH_DELAY_S
 from spotify_to_ytmusic.core.events import (
     AlbumProcessed,
     AlbumsDiscovered,
@@ -20,6 +21,7 @@ from spotify_to_ytmusic.core.models import (
     Track,
 )
 from spotify_to_ytmusic.core.spotify_client import SpotifyClient
+from spotify_to_ytmusic.core.track_cache import TrackCache
 from spotify_to_ytmusic.core.ytmusic_client import YTMusicClient
 
 
@@ -33,10 +35,12 @@ class Migrator:
         spotify: SpotifyClient,
         ytmusic: YTMusicClient,
         on_event: EventCallback = _noop,
+        cache: TrackCache | None = None,
     ):
         self.spotify = spotify
         self.ytmusic = ytmusic
         self.on_event = on_event
+        self.cache = cache if cache is not None else TrackCache(Path(TRACK_CACHE_FILE))
         self.report = MigrationReport()
 
     def migrate_playlists(self, playlist_ids: list[str] | None = None) -> None:
@@ -52,6 +56,7 @@ class Migrator:
             )
             if playlist:
                 self._migrate_playlist(playlist)
+        self.cache.flush()
 
     def _migrate_playlist(self, playlist: Playlist) -> None:
         self.on_event(PlaylistStarted(name=playlist.name, track_count=len(playlist.tracks)))
@@ -87,10 +92,20 @@ class Migrator:
                 not_found_labels=not_found,
             )
         )
+        self.cache.flush()
 
     def _find_track_video_id(self, track: Track) -> str | None:
+        hit, cached = self.cache.get(track.spotify_id)
+        if hit:
+            return cached
         time.sleep(YTMUSIC_SEARCH_DELAY_S)
-        return self.ytmusic.search_song(track.name, track.artist)
+        video_id = self.ytmusic.search_song(track.name, track.artist)
+        if track.spotify_id:
+            if video_id:
+                self.cache.set_hit(track.spotify_id, video_id)
+            else:
+                self.cache.set_miss(track.spotify_id)
+        return video_id
 
     def migrate_albums(self) -> None:
         albums = self.spotify.get_saved_albums()
