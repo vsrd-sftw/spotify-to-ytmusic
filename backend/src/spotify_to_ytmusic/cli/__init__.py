@@ -1,9 +1,11 @@
 """Command-line entry point. Translates Migrator events to console output."""
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
 
+import questionary
 from dotenv import load_dotenv
 
 from spotify_to_ytmusic.core.config import (
@@ -19,6 +21,7 @@ from spotify_to_ytmusic.core.events import (
     PlaylistsDiscovered,
 )
 from spotify_to_ytmusic.core.migrator import Migrator
+from spotify_to_ytmusic.core.models import PlaylistSummary
 from spotify_to_ytmusic.core.report import save_report
 from spotify_to_ytmusic.core.spotify_client import SpotifyClient
 from spotify_to_ytmusic.core.ytmusic_client import YTMusicClient
@@ -45,6 +48,29 @@ def _print_event(event: MigrationEvent) -> None:
         print(f"[album] {event.label}\n  {event.status}")
 
 
+def _select_playlists(summaries: list[PlaylistSummary]) -> list[str] | None:
+    """Returns selected playlist ids, [] if confirmed empty, or None if cancelled."""
+    if not summaries:
+        return []
+    choices = [
+        questionary.Choice(
+            title=f"{s.name}  ·  {s.track_count} tracks  ·  {'mía' if s.is_own else 'ajena'}",
+            value=s.id,
+        )
+        for s in summaries
+    ]
+    try:
+        selected = questionary.checkbox(
+            "Selecciona las playlists a migrar (espacio para marcar, enter para confirmar)",
+            choices=choices,
+        ).ask()
+    except KeyboardInterrupt:
+        return None
+    if selected is None:
+        return None
+    return list(selected)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Migrate Spotify library to YouTube Music"
@@ -63,6 +89,10 @@ def _require_env(name: str) -> str:
 
 
 def main() -> None:
+    # Silenciar los logs de error de HTTP internos de spotipy 
+    # para evitar spam en la consola por playlists inaccesibles (403)
+    logging.getLogger("spotipy.client").setLevel(logging.CRITICAL)
+
     load_dotenv()
     args = _parse_args()
 
@@ -88,8 +118,22 @@ def main() -> None:
 
     migrator = Migrator(spotify, ytmusic, on_event=_print_event)
 
-    if args.all_ or args.playlists:
+    print("\nFetching library from Spotify (this may take a few minutes depending on your library size)...")
+
+    if args.all_:
         migrator.migrate_playlists()
+    elif args.playlists:
+        user_id = spotify.get_current_user_id()
+        summaries = spotify.list_playlist_summaries(user_id)
+        print(f"Encontradas {len(summaries)} playlists\n")
+        selected_ids = _select_playlists(summaries)
+        if selected_ids is None:
+            print("Selección cancelada.")
+            sys.exit(0)
+        if not selected_ids:
+            print("No has seleccionado ninguna playlist.")
+            sys.exit(0)
+        migrator.migrate_playlists(playlist_ids=selected_ids)
     if args.all_ or args.albums:
         migrator.migrate_albums()
 

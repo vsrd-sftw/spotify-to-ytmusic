@@ -39,11 +39,19 @@ class Migrator:
         self.on_event = on_event
         self.report = MigrationReport()
 
-    def migrate_playlists(self) -> None:
-        playlists = self.spotify.get_all_playlists()
-        self.on_event(PlaylistsDiscovered(count=len(playlists)))
-        for playlist in playlists:
-            self._migrate_playlist(playlist)
+    def migrate_playlists(self, playlist_ids: list[str] | None = None) -> None:
+        user_id = self.spotify.get_current_user_id()
+        summaries = self.spotify.list_playlist_summaries(user_id)
+        if playlist_ids is not None:
+            wanted = set(playlist_ids)
+            summaries = [s for s in summaries if s.id in wanted]
+        self.on_event(PlaylistsDiscovered(count=len(summaries)))
+        for summary in summaries:
+            playlist = self.spotify.load_playlist_by_id(
+                summary.id, summary.name, summary.description
+            )
+            if playlist:
+                self._migrate_playlist(playlist)
 
     def _migrate_playlist(self, playlist: Playlist) -> None:
         self.on_event(PlaylistStarted(name=playlist.name, track_count=len(playlist.tracks)))

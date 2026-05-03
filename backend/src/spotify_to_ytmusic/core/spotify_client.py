@@ -13,7 +13,7 @@ from spotify_to_ytmusic.core.config import (
     SPOTIFY_TRACK_FETCH_DELAY_S,
     SPOTIFY_TRACK_PAGE_SIZE,
 )
-from spotify_to_ytmusic.core.models import Album, Playlist, Track
+from spotify_to_ytmusic.core.models import Album, Playlist, PlaylistSummary, Track
 
 
 class SpotifyClient:
@@ -27,17 +27,54 @@ class SpotifyClient:
             open_browser=True,
         ))
 
-    def get_all_playlists(self) -> list[Playlist]:
-        playlists: list[Playlist] = []
+    def get_current_user_id(self) -> str:
+        return self.sp.current_user()["id"]
+
+    def get_all_playlist_items(self) -> list[dict]:
+        """Gets all playlist metadata items from Spotify, without tracks."""
+        items: list[dict] = []
         page = self.sp.current_user_playlists(limit=SPOTIFY_PLAYLIST_PAGE_SIZE)
         while page:
-            for item in page["items"]:
-                playlist = self._build_playlist(item)
-                if playlist is not None:
-                    playlists.append(playlist)
+            items.extend(page["items"])
             page = self.sp.next(page) if page["next"] else None
-        return playlists
+        return items
 
+    def list_playlist_summaries(self, user_id: str) -> list[PlaylistSummary]:
+        """Lightweight listing: metadata only, no track fetches."""
+        summaries: list[PlaylistSummary] = []
+        for item in self.get_all_playlist_items():
+            if not item:
+                continue
+            owner_id = (item.get("owner") or {}).get("id", "")
+            # Spotify renamed the legacy "tracks" subobject to "items"; fall back for older shapes.
+            tracks_meta = item.get("items") or item.get("tracks") or {}
+            summaries.append(
+                PlaylistSummary(
+                    id=item["id"],
+                    name=item.get("name", "Unknown"),
+                    description=item.get("description") or "",
+                    track_count=tracks_meta.get("total", 0),
+                    owner_id=owner_id,
+                    is_own=(owner_id == user_id),
+                )
+            )
+        return summaries
+
+    def build_playlist_from_item(self, item: dict) -> Playlist | None:
+        """Builds a full Playlist object, including tracks, from a metadata item."""
+        return self._build_playlist(item)
+
+    def load_playlist_by_id(
+        self, playlist_id: str, name: str, description: str
+    ) -> Playlist | None:
+        """Loads tracks for a single playlist on demand."""
+        try:
+            tracks = self._get_playlist_tracks(playlist_id)
+        except SpotifyException as e:
+            if e.http_status == 403:
+                return None
+            raise
+        return Playlist(id=playlist_id, name=name, description=description, tracks=tracks)
     def _build_playlist(self, item: dict | None) -> Playlist | None:
         if not item:
             return None
@@ -63,22 +100,33 @@ class SpotifyClient:
                 track = self._build_track(item)
                 if track is not None:
                     tracks.append(track)
-            page = self.sp.next(page) if page["next"] else None
+            if page["next"]:
+                time.sleep(SPOTIFY_TRACK_FETCH_DELAY_S)
+                page = self.sp.next(page)
+            else:
+                page = None
         return tracks
 
     @staticmethod
     def _build_track(item: dict | None) -> Track | None:
-        track = item.get("track") if item else None
-        if not track or track.get("is_local") or not track.get("id"):
+        if not item:
+            return None
+        # Spotify's playlist_tracks response uses "item" for the track object;
+        # the legacy "track" key is now a boolean flag indicating item type.
+        track = item.get("item")
+        if not isinstance(track, dict):
+            track = item.get("track") if isinstance(item.get("track"), dict) else None
+        if not track:
             return None
         artists = track.get("artists") or []
-        artist_name = artists[0]["name"] if artists else "Unknown"
+        artist_name = artists[0].get("name", "Unknown") if artists else "Unknown"
+        album = track.get("album") or {}
         return Track(
-            name=track["name"],
+            name=track.get("name", "Unknown"),
             artist=artist_name,
-            album=track["album"]["name"],
-            duration_ms=track["duration_ms"],
-            spotify_id=track["id"],
+            album=album.get("name", "Unknown"),
+            duration_ms=track.get("duration_ms") or 0,
+            spotify_id=track.get("id") or "",
         )
 
     def get_saved_albums(self) -> list[Album]:

@@ -67,16 +67,34 @@ A `data/browser.json` file is created with your session.
 ## Usage
 
 ```bash
-# Migrate everything
+# Migrate everything (all playlists + saved albums, no prompts)
 python main.py --all
 
-# Or only one of:
+# Choose which playlists to migrate from an interactive checkbox list
 python main.py --playlists
+
+# Migrate saved albums only
 python main.py --albums
 
 # Or via the installed entry point:
 spotify-to-ytmusic --all
 ```
+
+When using `--playlists`, the CLI lists every playlist in your library with its
+track count and whether you own it, then opens a multi-select prompt:
+
+```
+Encontradas 151 playlists
+
+? Selecciona las playlists a migrar (espacio para marcar, enter para confirmar)
+  ❯ ◯ My top tracks playlist  ·  5 tracks  ·  mía
+    ◯ ol' kanye beats  ·  4 tracks  ·  mía
+    ◯ horny  ·  35 tracks  ·  ajena
+    ...
+```
+
+Tracks are only fetched from Spotify for the playlists you actually pick — the
+listing itself is near-instant even for large libraries.
 
 On first run, Spotify will open a browser for OAuth authorization. The token
 is cached in `data/.cache`.
@@ -112,17 +130,22 @@ the same hook to stream progress to the frontend.
 ```
 core/
 ├── config.py          # Constants (rate limits, page sizes, paths)
-├── models.py          # Domain types
+├── models.py          # Domain types (Track, Playlist, PlaylistSummary, ...)
 ├── events.py          # MigrationEvent variants
 ├── text.py            # normalize() for fuzzy matching
 ├── headers_parser.py  # Browser headers → ytmusicapi format
-├── spotify_client.py  # Wraps spotipy
+├── spotify_client.py  # Wraps spotipy; lists summaries fast, loads tracks on demand
 ├── ytmusic_client.py  # Wraps ytmusicapi (search, save, create)
 ├── migrator.py        # Orchestrator (no I/O presentation)
 └── report.py          # JSON serialization
-cli/                   # argparse + event-to-print mapping
+cli/                   # argparse + interactive selector + event-to-print mapping
 api/                   # (planned) FastAPI app
 ```
+
+`SpotifyClient` separates discovery from track loading: `list_playlist_summaries()`
+returns lightweight metadata (name, track count, owner) for the whole library in
+a single paginated call, and `load_playlist_by_id()` fetches the actual tracks
+only when a playlist is going to be migrated.
 
 ## Data directory
 

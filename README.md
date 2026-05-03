@@ -9,7 +9,8 @@ This is a monorepo:
 
 ## Features
 
-- Migrates all your Spotify playlists (including private and collaborative ones)
+- Interactive selector to pick which playlists to migrate (one, several, or all)
+- Migrates Spotify playlists (including private and collaborative ones)
 - Migrates your saved albums as liked albums on YouTube Music
 - Track and album matching with artist-name validation and fuzzy fallbacks
 - JSON report with statistics and a list of items not found
@@ -31,8 +32,11 @@ cp .env.example .env
 # Authenticate against YouTube Music (writes data/browser.json)
 python setup_ytmusic.py
 
-# Migrate
+# Migrate everything (no prompts)
 python main.py --all
+
+# Or pick which playlists to migrate from an interactive list
+python main.py --playlists
 ```
 
 For full backend setup (Spotify Developer app, OAuth steps, browser headers

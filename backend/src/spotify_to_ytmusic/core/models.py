@@ -24,6 +24,16 @@ class Playlist:
 
 
 @dataclass
+class PlaylistSummary:
+    id: str
+    name: str
+    description: str
+    track_count: int
+    owner_id: str
+    is_own: bool
+
+
+@dataclass
 class Album:
     name: str
     artist: str
