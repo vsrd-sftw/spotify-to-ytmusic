@@ -34,8 +34,9 @@ python backend/main.py --albums         # saved albums only
 cd backend && python setup_ytmusic.py
 ```
 
-No test suite, no linter wired into CI. `pytest` and `ruff` are listed in
-`[project.optional-dependencies].dev` but there are no tests to run.
+`pytest` and `ruff` are listed in `[project.optional-dependencies].dev`.
+There is no CI yet, but new code is expected to ship with tests — see the
+Definition of Done below.
 
 ## Architecture in one paragraph
 
@@ -86,10 +87,40 @@ in git history, so check the relevant commit before "improving" any of this.
 - Conventional Commits with scope: `feat(cli)`, `fix(ytmusic)`,
   `feat(cache)`, `feat(migrator)`, `docs`, `chore(config)`. Recent history
   is consistent; new commits should follow.
-- Don't write tests unless the user asks — there's no harness to run them
-  against and adding one is a project-level decision.
 - Don't add comments that just restate what the code does. The existing
   comments mark non-obvious behavior (the gotchas above) — that's the bar.
+
+## Definition of Done
+
+A task is **only done** when **all** of the following hold. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full version — this is the short
+form so it's always in your context:
+
+1. **All acceptance criteria met.** If the task came from an issue, every
+   checkbox in the issue is satisfied. If from a verbal request, restate
+   what "done" means and verify each point.
+2. **SOLID + clean code.** Single responsibility per module/class, small
+   focused functions, meaningful names, no dead code, no premature
+   abstraction. When in doubt, prefer the simplest thing that works over
+   a generic framework.
+3. **Tests exist and pass.** New behavior has unit tests; bug fixes get a
+   regression test that fails before the fix and passes after. Run
+   `pytest` from `backend/` and confirm green before declaring done.
+   Frontend tests (Vitest) when/where the frontend gets behavior worth
+   testing.
+4. **Architectural fit.** Respect the existing layering:
+   - No `print()` from `core/` — emit a `MigrationEvent` and let the CLI
+     layer render it.
+   - Reuse `SpotifyClient` / `YTMusicClient` / `TrackCache` instead of
+     calling `spotipy` / `ytmusicapi` directly from new code.
+   - Tunables go in [config.py](backend/src/spotify_to_ytmusic/core/config.py),
+     not hardcoded.
+   - Don't bootstrap the FastAPI server (`api/`) or the frontend unless
+     the task explicitly asks for it.
+
+If any of these can't be met for a real reason, **say so explicitly in
+the PR/handoff** rather than silently skipping. "No tests because X" is
+acceptable; "done" without tests when tests were possible is not.
 
 ## What lives where
 
