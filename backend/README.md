@@ -136,6 +136,7 @@ core/
 ├── headers_parser.py  # Browser headers → ytmusicapi format
 ├── spotify_client.py  # Wraps spotipy; lists summaries fast, loads tracks on demand
 ├── ytmusic_client.py  # Wraps ytmusicapi (search, save, create)
+├── track_cache.py     # Persistent {spotify_id → videoId} lookup cache
 ├── migrator.py        # Orchestrator (no I/O presentation)
 └── report.py          # JSON serialization
 cli/                   # argparse + interactive selector + event-to-print mapping
@@ -160,6 +161,14 @@ Files written there:
 - `browser.json` — YouTube Music session
 - `.cache` — Spotify OAuth refresh token
 - `migration_report_*.json` — One per run
+- `track_cache.json` — Persistent map of Spotify track ids to YT Music
+  videoIds (and a sentinel for tracks that came back empty). The
+  Migrator consults this before every search, so a failed run that's
+  retried doesn't repeat the slow YT Music search calls. The cache is
+  flushed to disk after each playlist finishes, so a Ctrl+C only loses
+  work for the playlist in flight. Delete the file to force a full
+  re-search (e.g. if you suspect YT Music has added catalogue entries
+  that were misses before).
 
 The whole `data/` directory is gitignored.
 

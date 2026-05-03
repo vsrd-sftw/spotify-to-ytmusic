@@ -13,6 +13,8 @@ This is a monorepo:
 - Migrates Spotify playlists (including private and collaborative ones)
 - Migrates your saved albums as liked albums on YouTube Music
 - Track and album matching with artist-name validation and fuzzy fallbacks
+- Persistent search cache — retrying a failed migration doesn't repeat
+  the slow YouTube Music searches
 - JSON report with statistics and a list of items not found
 - Event-driven `Migrator` ready to drive a UI over WebSockets
 
@@ -60,6 +62,7 @@ spotify-to-ytmusic/
 │   ├── data/                       # Runtime state (gitignored)
 │   │   ├── browser.json
 │   │   ├── .cache                  # Spotify OAuth token cache
+│   │   ├── track_cache.json        # YT Music search cache (persistent)
 │   │   └── migration_report_*.json
 │   └── src/
 │       └── spotify_to_ytmusic/
@@ -72,6 +75,7 @@ spotify-to-ytmusic/
 │           │   ├── headers_parser.py
 │           │   ├── spotify_client.py
 │           │   ├── ytmusic_client.py
+│           │   ├── track_cache.py  # Persistent YT Music search cache
 │           │   ├── migrator.py     # Event-driven orchestrator
 │           │   └── report.py       # JSON report serialization
 │           ├── cli/                # Console entry point
