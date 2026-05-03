@@ -1,6 +1,7 @@
 # --- Secrets / runtime state ---
 backend/.env
 backend/data/
+.gh/
 
 # --- Python (backend) ---
 __pycache__/
@@ -49,6 +50,9 @@ pnpm-debug.log*
 *~
 .DS_Store
 Thumbs.db
+./claude/
+./scripts
+FRONTEDN_PLAN.md
 
 # --- Tests / coverage / linters ---
 .pytest_cache/
@@ -57,3 +61,8 @@ htmlcov/
 .tox/
 .mypy_cache/
 .ruff_cache/
+FRONTEND_PLAN.md
+.claude/settings.local.json
+scripts/create_issues.sh
+scripts/gh-env.ps1
+scripts/gh-env.sh
