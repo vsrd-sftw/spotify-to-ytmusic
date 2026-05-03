@@ -66,3 +66,4 @@ FRONTEND_PLAN.md
 scripts/create_issues.sh
 scripts/gh-env.ps1
 scripts/gh-env.sh
+data/.cache

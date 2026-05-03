@@ -112,12 +112,19 @@ class YTMusicClient:
     ) -> Optional[str]:
         try:
             playlist_id = self.yt.create_playlist(name, description)
-            for chunk in self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE):
-                self.yt.add_playlist_items(playlist_id, chunk)
-                time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
-            return playlist_id
         except Exception:
             return None
+        for chunk in self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE):
+            try:
+                # duplicates=True: ytmusicapi rejects the whole chunk if any
+                # videoId already exists in the playlist; Spotify playlists can
+                # repeat tracks and YT search can map distinct tracks to the same
+                # videoId, so without this we silently lose entire chunks.
+                self.yt.add_playlist_items(playlist_id, chunk, duplicates=True)
+            except Exception:
+                pass
+            time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
+        return playlist_id
 
     @staticmethod
     def _chunked(items: list, size: int):
