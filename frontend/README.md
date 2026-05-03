@@ -21,16 +21,16 @@ npx tailwindcss init -p
 
 ## Backend contract (planned)
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/api/health` | Liveness probe |
-| `POST` | `/api/auth/spotify` | Trigger Spotify OAuth |
-| `POST` | `/api/auth/ytmusic` | Submit pasted browser headers |
-| `GET` | `/api/playlists` | List user's Spotify playlists |
-| `GET` | `/api/albums` | List user's saved Spotify albums |
-| `POST` | `/api/migrate` | Start migration (returns job id) |
-| `WS` | `/api/migrate/{job_id}/events` | Stream `MigrationEvent`s |
-| `GET` | `/api/reports` | List previous reports |
-| `GET` | `/api/reports/{id}` | Fetch a report |
+| Method | Path                           | Purpose                          |
+| ------ | ------------------------------ | -------------------------------- |
+| `GET`  | `/api/health`                  | Liveness probe                   |
+| `POST` | `/api/auth/spotify`            | Trigger Spotify OAuth            |
+| `POST` | `/api/auth/ytmusic`            | Submit pasted browser headers    |
+| `GET`  | `/api/playlists`               | List user's Spotify playlists    |
+| `GET`  | `/api/albums`                  | List user's saved Spotify albums |
+| `POST` | `/api/migrate`                 | Start migration (returns job id) |
+| `WS`   | `/api/migrate/{job_id}/events` | Stream `MigrationEvent`s         |
+| `GET`  | `/api/reports`                 | List previous reports            |
+| `GET`  | `/api/reports/{id}`            | Fetch a report                   |
 
 The backend's `Migrator` already emits typed events via `on_event` callback — the WebSocket endpoint just forwards them as JSON.
