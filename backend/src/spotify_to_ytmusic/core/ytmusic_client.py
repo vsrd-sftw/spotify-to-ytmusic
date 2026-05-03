@@ -6,6 +6,8 @@ from ytmusicapi import YTMusic
 
 from spotify_to_ytmusic.core.config import (
     BROWSER_AUTH_FILE,
+    YTMUSIC_ADD_ITEMS_BACKOFF_BASE_S,
+    YTMUSIC_ADD_ITEMS_MAX_RETRIES,
     YTMUSIC_PLAYLIST_CHUNK_DELAY_S,
     YTMUSIC_PLAYLIST_CHUNK_SIZE,
     YTMUSIC_SEARCH_RESULT_LIMIT,
@@ -115,16 +117,33 @@ class YTMusicClient:
         except Exception:
             return None
         for chunk in self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE):
-            try:
-                # duplicates=True: ytmusicapi rejects the whole chunk if any
-                # videoId already exists in the playlist; Spotify playlists can
-                # repeat tracks and YT search can map distinct tracks to the same
-                # videoId, so without this we silently lose entire chunks.
-                self.yt.add_playlist_items(playlist_id, chunk, duplicates=True)
-            except Exception:
-                pass
+            self._add_chunk_with_retry(playlist_id, chunk)
             time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
         return playlist_id
+
+    def _add_chunk_with_retry(self, playlist_id: str, chunk: list[str]) -> bool:
+        # YT Music throttles add_playlist_items intermittently and the response
+        # comes back empty, surfacing as a JSONDecodeError. The failure is
+        # transient: a backoff retry recovers the same chunk.
+        # duplicates=True is required because ytmusicapi rejects the whole
+        # chunk on any duplicate videoId (Spotify allows repeats and YT search
+        # can collapse distinct tracks to the same id).
+        delay = YTMUSIC_ADD_ITEMS_BACKOFF_BASE_S
+        for attempt in range(1, YTMUSIC_ADD_ITEMS_MAX_RETRIES + 1):
+            try:
+                response = self.yt.add_playlist_items(
+                    playlist_id, chunk, duplicates=True
+                )
+            except Exception:
+                response = None
+            if isinstance(response, dict) and str(response.get("status", "")).startswith(
+                "STATUS_SUCCEEDED"
+            ):
+                return True
+            if attempt < YTMUSIC_ADD_ITEMS_MAX_RETRIES:
+                time.sleep(delay)
+                delay *= 2
+        return False
 
     @staticmethod
     def _chunked(items: list, size: int):
