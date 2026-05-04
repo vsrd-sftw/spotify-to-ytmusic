@@ -6,11 +6,13 @@ live in `README.md` and `backend/README.md`.
 ## What this is
 
 CLI that migrates a Spotify library (playlists + saved albums) to YouTube
-Music. Monorepo: `backend/` is the Python package and CLI; `frontend/` is a
-planned Vite/React UI that doesn't exist yet (only a README placeholder).
-There is also an empty `backend/src/spotify_to_ytmusic/api/` reserved for a
-future FastAPI server. **Don't bootstrap the frontend or the API server
-unless asked** — the project is CLI-only today.
+Music. Monorepo: `backend/` is the Python package and CLI; `frontend/` is
+a Vite/React 19 + TanStack Query scaffolding being built incrementally
+issue-by-issue (no real UI yet, just typed contracts and MSW stubs of the
+planned API). There is also an empty `backend/src/spotify_to_ytmusic/api/`
+reserved for a future FastAPI server. **Don't expand the frontend or
+bootstrap the API server beyond what the current task asks** — there is
+no live HTTP backend today, the CLI is the only working entry point.
 
 ## Where to run things
 
@@ -79,6 +81,14 @@ in git history, so check the relevant commit before "improving" any of this.
   temporarily — but don't ship it raised, the spam is overwhelming.
 - **Tracks with empty `spotify_id`** (rare local files) bypass the cache.
   Don't assume every Track has a usable id.
+- **The frontend uses pnpm, not npm.** `pnpm-lock.yaml` is the source of
+  truth. npm 11.12.1 crashes with `Cannot read properties of null (reading
+  'matches')` (arborist bug) when installing some deps like `msw`. Use
+  `pnpm add` / `pnpm install` from `frontend/`.
+- **MSW path patterns must be `*/api/...`, not `/api/...`.** Relative paths
+  match in the browser worker but not in Vitest's Node environment, so
+  handler tests silently fall through to `onUnhandledRequest: 'error'`. See
+  [handlers.ts](frontend/src/test/msw/handlers.ts).
 
 ## Style and conventions
 
@@ -141,6 +151,15 @@ backend/src/spotify_to_ytmusic/
         text.py                                   # normalize() for fuzzy matching
         headers_parser.py                         # Browser headers → ytmusicapi
 backend/data/                                     # Runtime state, gitignored
+
+frontend/                                         # Vite + React 19 + TanStack Query
+    public/mockServiceWorker.js                   # MSW worker (generated, committed)
+    src/
+        main.tsx                                  # Boots MSW in dev, then mounts App
+        types/api.ts                              # TS mirror of backend models + events
+        test/setup.ts                             # Vitest + MSW server lifecycle
+        test/msw/                                 # handlers, fixtures, server, browser
+        lib/query-client.ts                       # TanStack Query client
 ```
 
 ## Plan files
