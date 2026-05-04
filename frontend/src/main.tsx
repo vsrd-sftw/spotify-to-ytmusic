@@ -6,11 +6,19 @@ import './index.css'
 import App from './App.tsx'
 import { queryClient } from '@/lib/query-client'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-    </QueryClientProvider>
-  </StrictMode>,
-)
+async function enableMocking() {
+  if (!import.meta.env.DEV) return
+  const { worker } = await import('@/test/msw/browser')
+  await worker.start({ onUnhandledRequest: 'bypass' })
+}
+
+enableMocking().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      </QueryClientProvider>
+    </StrictMode>,
+  )
+})
