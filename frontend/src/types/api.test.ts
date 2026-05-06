@@ -13,10 +13,12 @@ function describeEvent(event: MigrationEvent): string {
       return `discovered ${event.count} albums`;
     case 'AlbumProcessed':
       return `${event.label}: ${event.status}`;
-    default: {
-      const _exhaustive: never = event;
-      return _exhaustive;
-    }
+    case 'PlaylistCreationFailed':
+      return `failed creating ${event.name}: ${event.reason}`;
+    case 'PlaylistChunkFailed':
+      return `chunk ${event.chunkIndex}/${event.totalChunks} failed in ${event.name}`;
+    case 'AlbumSaveFailed':
+      return `failed saving ${event.label}: ${event.reason}`;
   }
 }
 
@@ -34,7 +36,10 @@ describe('MigrationEvent', () => {
       },
       { type: 'AlbumsDiscovered', count: 2 },
       { type: 'AlbumProcessed', label: 'a - b', status: 'saved' },
+      { type: 'PlaylistCreationFailed', name: 'p', reason: 'err' },
+      { type: 'PlaylistChunkFailed', name: 'p', chunkIndex: 0, totalChunks: 1, reason: 'err' },
+      { type: 'AlbumSaveFailed', label: 'a - b', reason: 'err' },
     ];
-    expect(events.map(describeEvent)).toHaveLength(5);
+    expect(events.map(describeEvent)).toHaveLength(8);
   });
 });

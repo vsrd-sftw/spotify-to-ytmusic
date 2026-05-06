@@ -51,6 +51,12 @@ function formatEvent(event: MigrationEvent): string {
       };
       return `"${event.label}": ${statusLabel[event.status]}`;
     }
+    case 'PlaylistCreationFailed':
+      return `Error creando "${event.name}": ${event.reason}`;
+    case 'PlaylistChunkFailed':
+      return `Error chunk ${event.chunkIndex + 1}/${event.totalChunks} en "${event.name}": ${event.reason}`;
+    case 'AlbumSaveFailed':
+      return `Error guardando "${event.label}": ${event.reason}`;
   }
 }
 

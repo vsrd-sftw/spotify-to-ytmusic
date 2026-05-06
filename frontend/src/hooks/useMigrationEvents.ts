@@ -182,6 +182,11 @@ export function migrationReducer(
         },
       };
     }
+
+    case 'PlaylistCreationFailed':
+    case 'PlaylistChunkFailed':
+    case 'AlbumSaveFailed':
+      return { ...state, events };
   }
 }
 
