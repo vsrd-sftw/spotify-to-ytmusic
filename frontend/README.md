@@ -1,13 +1,19 @@
 # Frontend
 
-Interfaz web para `spotify-to-ytmusic`. Se comunica con el backend FastAPI en `../backend` via HTTP + WebSockets.
+Interfaz web para `spotify-to-ytmusic`. Habla con el backend (cuando
+exista, ver issues #67–#71) vía HTTP + WebSocket bajo el prefijo
+`/api`. Mientras tanto, **todas las llamadas las sirve MSW**.
 
-## Stack recomendado
+## Stack
 
-- **Vite** + **React** + **TypeScript**
-- **TailwindCSS** para estilos
-- **TanStack Query** para estado HTTP
-- WebSocket nativo para progreso en vivo de migraciones
+- **Vite 8** + **React 19** + **TypeScript**
+- **react-router-dom 7** (rutas reales: `/connect`, `/library`,
+  `/migrate`, `/reports`, `/reports/:id`)
+- **TanStack Query 5** para estado HTTP
+- **TailwindCSS 3** para estilos
+- **MSW 2** para mockear el backend mientras no exista
+- **Vitest** + **Testing Library** para tests
+- WebSocket nativo con reconexión exponencial
 
 ## Inicio rápido
 
@@ -16,81 +22,144 @@ pnpm install
 pnpm dev
 ```
 
-Abre http://localhost:5173 en tu navegador.
+Abre http://localhost:5173. La app arranca el worker MSW y todo el
+tráfico `*/api/*` lo intercepta — verás la UI completamente funcional
+contra fixtures.
+
+> **Importante:** usa `pnpm`, no `npm`. `pnpm-lock.yaml` es la fuente
+> de verdad. Algunos paquetes (`msw`) provocan crashes en npm 11.x.
 
 ## Scripts
 
 | Script | Propósito |
 | ------ | -------- |
 | `pnpm dev` | Servidor de desarrollo con HMR |
-| `pnpm build` | Build de producción |
-| `pnpm lint` | Lint con ESLint |
-| `pnpm format` | Format con Prettier |
-| `pnpm format:check` | Verifica formato sin modificar |
-| `pnpm test` | Tests en modo watch |
-| `pnpm test:run` | Tests una vez |
+| `pnpm build` | `tsc -b && vite build` |
+| `pnpm lint` | ESLint |
+| `pnpm format` / `format:check` | Prettier |
+| `pnpm test` | Vitest en watch mode |
+| `pnpm test:run` | Vitest una pasada (lo que corre CI) |
 
-## Mocks (MSW)
+## Arquitectura
 
-El proyecto usa **MSW** para mockear el backend durante desarrollo. Los mocks están en `src/test/msw/`.
-
-### Cómo funcionan
-
-En `src/main.tsx`, `enableMocking()` inicia el Service Worker solo en entorno de desarrollo:
-
-```tsx
-async function enableMocking() {
-  if (!import.meta.env.DEV) return
-  const { worker } = await import('@/test/msw/browser')
-  await worker.start({ onUnhandledRequest: 'bypass' })
-}
+```
+src/
+├── main.tsx              # MSW + ErrorBoundary + BrowserRouter + QueryClient
+├── App.tsx               # <Routes> dentro de <SelectionProvider>
+├── pages/                # Una carpeta por ruta top-level
+│   ├── Connect/          # Spotify + YT Music
+│   ├── Library/          # Tabs Playlists/Albums + selección
+│   ├── Migrate/          # Confirmación + EventLog en vivo
+│   └── Reports/          # List + Detail con deep-link a /reports/:id
+├── components/
+│   ├── layout/           # AppShell, Header (NavLink), Footer, ErrorBoundary, ConnectionStatus
+│   ├── ui/               # Button, Toast, Card, Input, Skeleton, Spinner, FieldError, …
+│   ├── library/          # Tabs, SelectionSummary
+│   └── migrate/          # PlaylistProgress, AlbumProgress, NotFound, CompletionSummary, ConnectionBanner
+├── features/             # TanStack Query hooks por dominio
+│   ├── auth/             # useSpotifyAuth, useYTMusicAuth, useHealth
+│   ├── library/          # usePlaylists, useAlbums, useSelection (delega en SelectionContext)
+│   ├── migrate/          # useStartMigration, useMigrationSelection, derivaciones del log
+│   └── reports/          # useReports, useReport
+├── contexts/             # SelectionContext (lookup de selección entre páginas)
+├── hooks/
+│   ├── useMigrationEvents.ts    # WS + reducer incremental
+│   ├── useAutoFocusHeading.ts   # Focus management por página (a11y)
+│   └── useFocusTrap.ts          # Trap para diálogos (Reports/Detail)
+├── lib/
+│   ├── http.ts           # fetch wrapper con AbortSignal.timeout (15s default)
+│   ├── ws.ts             # WsConnection con backoff y short-circuit en cierres limpios
+│   ├── query-client.ts   # TanStack Query client
+│   ├── download.ts       # Descarga blob → JSON
+│   └── ToastContext.tsx
+├── types/api.ts          # Espejo manual de los modelos del backend (será generado desde OpenAPI en #71)
+└── test/
+    ├── setup.ts          # Vitest + MSW lifecycle
+    └── msw/              # handlers, fixtures, server (Node), browser (worker)
 ```
 
-### Desactivar mocks
+### Patrones que NO hay que romper
 
-Cuando el backend FastAPI esté disponible, comenta o elimina la llamada a `enableMocking()` en `src/main.tsx`:
+- **La selección vive en `SelectionContext`**, no en `useState` por
+  página. `useSelection` (en `features/library/`) delega ahí: si añades
+  una página que necesite leer la selección, lee del context, no
+  reintroduzcas estado local.
+- **Las rutas se navegan con `<NavLink>` / `<Link>` / `useNavigate`**.
+  No vuelvas a un enum `section`.
+- **Cada página gestiona su propio focus** con `useAutoFocusHeading`.
+  No hagas un `useEffect` global en `App.tsx`.
+- **Las llamadas HTTP pasan por `lib/http.ts`** para heredar el timeout
+  de 15 s. No llames a `fetch` directamente desde features.
+- **El WS reconecta solo en cierres anormales.** `WsConnection.onclose`
+  trata `wasClean || code === 1000 || code === 1005` como cierre final.
+  Si añades streams nuevos, asegúrate de que el servidor cierra con
+  `1000` cuando termina (MSW lo hace ya, FastAPI tendrá que hacerlo
+  también — ver #70).
 
-```tsx
-// Desactivar cuando haya backend real:
-// enableMocking().then(() => { ... })
+### Mocks (MSW)
 
-// Mientras tanto:
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>
-)
+Hoy la app entera corre contra MSW. Los handlers están en
+[`src/test/msw/handlers.ts`](src/test/msw/handlers.ts) y las fixtures en
+[`src/test/msw/fixtures.ts`](src/test/msw/fixtures.ts).
+
+Los patrones de ruta **deben empezar con `*/api/...`**, no `/api/...`.
+Las rutas relativas no matchean en el entorno Node de Vitest (sí en el
+worker del navegador), y los tests fallan silenciosamente con
+`onUnhandledRequest: 'error'`.
+
+```ts
+// ✅ Match en navegador y en Node (Vitest)
+http.get('*/api/playlists', () => HttpResponse.json([...]))
+
+// ❌ Solo match en navegador
+http.get('/api/playlists', () => HttpResponse.json([...]))
 ```
 
-### Cambiar el endpoint
+### Conmutar a backend real
 
-Edita los handlers en `src/test/msw/handlers.ts` para apuntar al backend real cuando lo necesites.
+Cuando el FastAPI exista (issues #67–#70 + proxy en #71):
 
-## Tests
+1. `vite.config.ts` ganará un `server.proxy` apuntando `/api` al puerto
+   del backend.
+2. `main.tsx` arrancará MSW solo si `VITE_USE_MSW=true`. Sin esa flag,
+   las peticiones se irán al backend a través del proxy.
 
-Ejecuta con:
-
-```bash
-pnpm test        # watch mode
-pnpm test:run    # una vez
-```
-
-Los tests usan **Vitest** + **Testing Library**. Ver `src/test/setup.ts` para la configuración.
+Hasta entonces, MSW siempre está ON en desarrollo y hay que vivir con
+los fixtures.
 
 ## Contrato con el backend
 
-| Method | Path | Propósito |
-| ------ | ---- | -------- |
-| `GET` | `/api/health` | Liveness probe |
-| `POST` | `/api/auth/spotify` | Trigger Spotify OAuth |
-| `POST` | `/api/auth/ytmusic` | Submit browser headers |
-| `GET` | `/api/playlists` | List playlists de Spotify |
-| `GET` | `/api/albums` | List albums guardados |
-| `POST` | `/api/migrate` | Iniciar migración |
-| `WS` | `/api/migrate/{job_id}/events` | Stream de eventos |
-| `GET` | `/api/reports` | List reportes |
-| `GET` | `/api/reports/{id}` | Ver reporte |
+| Method | Path | Quién lo consume |
+| ------ | ---- | ---------------- |
+| `GET` | `/api/health` | `useHealth` (badge en header) |
+| `POST` | `/api/auth/spotify` | `useSpotifyAuth` → redirige a `accounts.spotify.com` |
+| `POST` | `/api/auth/ytmusic` | `useYTMusicAuth` (envía headers pegados) |
+| `GET` | `/api/playlists` | `usePlaylists` |
+| `GET` | `/api/albums` | `useAlbums` |
+| `POST` | `/api/migrate` | `useStartMigration` (devuelve `{ jobId }`) |
+| `WS` | `/api/migrate/{jobId}/events` | `useMigrationEvents` (eventos tipados → reducer) |
+| `GET` | `/api/reports` | `useReports` |
+| `GET` | `/api/reports/:id` | `useReport` |
 
-El backend emite eventos tipados via `on_event` callback — el endpoint WebSocket los reenvía como JSON.
+Los tipos espejo del backend están en [`src/types/api.ts`](src/types/api.ts).
+La generación automática desde `/openapi.json` la cubre la issue #71.
+
+## Tests
+
+```bash
+pnpm test:run
+```
+
+258+ tests en este momento (suite completa frontend). Los tests de hooks
+con WebSocket usan un mock `MockWebSocket` definido en cada archivo —
+mira `useMigrationEvents.test.tsx` como referencia.
+
+## Accesibilidad
+
+- Skip-link "Ir al contenido principal" en `AppShell`.
+- `<main role="main">` con focus trap manejado por hooks dedicados.
+- `aria-current="page"` en navegación, `aria-live="polite"` en el log
+  de eventos, `role="tablist"` en Library con keyboard navigation
+  (←/→ entre tabs).
+- `ConnectionBadge` distingue estados con icono + color (no solo color)
+  para cumplir WCAG 1.4.1.

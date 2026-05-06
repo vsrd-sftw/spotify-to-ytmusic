@@ -4,8 +4,26 @@ Migrate your Spotify library to YouTube Music — playlists and saved albums inc
 
 This is a monorepo:
 
-- **`backend/`** — Python package with the migration logic, CLI, and (planned) FastAPI server.
-- **`frontend/`** — Web UI (planned: Vite + React + TypeScript).
+- **`backend/`** — Python package with the migration logic and CLI. Ships
+  a working CLI today; emits typed events ready for an HTTP/WebSocket
+  transport. The FastAPI server (`api/`) is reserved for issues #67–#70.
+- **`frontend/`** — Vite + React 19 + TypeScript + TanStack Query +
+  react-router-dom 7. Full UI built page by page (Connect, Library,
+  Migrate, Reports). Currently runs against [MSW](https://mswjs.io)
+  mocks — there is no live HTTP backend yet, so OAuth, migration jobs
+  and reports listing are simulated until issues #67–#71 land.
+
+## Status
+
+- **Working today:** the CLI (`python backend/main.py …`) does the full
+  Spotify → YouTube Music migration end-to-end and writes a JSON report.
+- **Working in dev mode:** `pnpm dev` boots the frontend with MSW
+  mocking every `/api/*` call. You can navigate, select playlists,
+  trigger a "migration" (fixture event stream) and download a fixture
+  report. None of it talks to a real server.
+- **Next big block of work:** issues #67–#71 (FastAPI server + OpenAPI
+  types + Vite proxy). After that, #72–#74 wrap everything in a Tauri 2
+  desktop app.
 
 ## Features
 
@@ -17,6 +35,9 @@ This is a monorepo:
   the slow YouTube Music searches
 - JSON report with statistics and a list of items not found
 - Event-driven `Migrator` ready to drive a UI over WebSockets
+- Typed exception layer (`YTMusicTransientError` vs `YTMusicFatalError`)
+  so transient throttling retries silently while fatal failures (auth,
+  permanent 4xx) propagate and are recorded in the report
 
 ## Quick start
 
@@ -80,10 +101,23 @@ spotify-to-ytmusic/
 │           │   └── report.py       # JSON report serialization
 │           ├── cli/                # Console entry point
 │           │   └── __init__.py
-│           └── api/                # (planned) FastAPI app
+│           └── api/                # (planned) FastAPI app — see #67
 │               └── __init__.py
-└── frontend/                       # (planned) Vite + React + TS UI
-    └── README.md
+└── frontend/
+    ├── package.json                # pnpm workspace
+    ├── vite.config.ts
+    ├── public/mockServiceWorker.js # MSW worker (committed)
+    └── src/
+        ├── main.tsx                # MSW + ErrorBoundary + BrowserRouter
+        ├── App.tsx                 # <Routes> for /connect /library /migrate /reports
+        ├── pages/                  # One folder per top-level route
+        ├── components/{layout,ui,library,migrate}/
+        ├── features/{auth,library,migrate,reports}/   # TanStack Query hooks
+        ├── contexts/SelectionContext.tsx              # Cross-page selection
+        ├── hooks/                  # useAutoFocusHeading, useFocusTrap, useMigrationEvents
+        ├── lib/                    # http (timeout-aware), ws, query-client
+        ├── types/api.ts            # Hand-mirrored TS types (will be generated from OpenAPI in #71)
+        └── test/msw/               # Handlers, fixtures, server, browser worker
 ```
 
 ## License

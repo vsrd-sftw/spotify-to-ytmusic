@@ -124,8 +124,31 @@ couldn't be found at all on YouTube Music are listed under `not_found`.
 
 The `Migrator` is event-driven: it accepts an `on_event` callback that
 receives typed events (`PlaylistStarted`, `AlbumProcessed`, ...). The CLI
-uses this to print progress; a future FastAPI WebSocket endpoint will use
-the same hook to stream progress to the frontend.
+uses this to print progress; the future FastAPI WebSocket endpoint
+(issue #70) will use the same hook to stream progress to the frontend.
+
+### Error taxonomy in `YTMusicClient`
+
+Public methods of `YTMusicClient` raise one of three types instead of
+returning `None` or swallowing exceptions:
+
+- `YTMusicAuthError` — only on construction, when `_verify_auth` cannot
+  search at all. Means `browser.json` is missing or expired; the user
+  must rerun `setup_ytmusic.py`.
+- `YTMusicTransientError` — network blips, throttling, or partial JSON
+  responses. Already retried with exponential backoff inside the client;
+  if it surfaces, the retry budget is exhausted. Callers may decide to
+  skip the item and continue with the next.
+- `YTMusicFatalError` — auth/quota/4xx persistent failures, or anything
+  the classifier cannot positively identify as transient. The `Migrator`
+  catches it per playlist/album, records the reason in
+  `MigrationReport.error`, and continues.
+
+Why both errors propagate instead of returning `None`: silent fallbacks
+masked failures that wasted the retry budget and showed empty playlists
+in YouTube Music with no explanation. See
+[ytmusic_client.py `_classify_exception`](src/spotify_to_ytmusic/core/ytmusic_client.py)
+for the mapping.
 
 ```
 core/
@@ -171,6 +194,20 @@ Files written there:
   that were misses before).
 
 The whole `data/` directory is gitignored.
+
+## Tests
+
+```bash
+cd backend
+pip install -e ".[dev]"
+pytest
+```
+
+The suite under `backend/tests/` covers `Migrator` and `YTMusicClient`
+(error classification, retry/backoff, fatal propagation). It is **not
+yet exhaustive** — issue #66 tracks the gap (Spotify payload shapes,
+TrackCache atomicity, fixture-based regression tests for every gotcha
+in `CLAUDE.md`). When in doubt, write a test before the fix.
 
 ## Limitations
 
