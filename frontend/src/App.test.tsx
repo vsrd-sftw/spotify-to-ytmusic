@@ -16,10 +16,8 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /spotify.*yt music/i })).toBeInTheDocument()
   })
 
-  it('resolves the test useQuery and renders its data', async () => {
+  it('renders the connect section by default', () => {
     renderWithClient(<App />)
-    const status = await screen.findByTestId('ping-status')
-    await screen.findByText('ok')
-    expect(status).toHaveTextContent('ok')
+    expect(screen.getByText(/conectar spotify/i)).toBeInTheDocument()
   })
 })
