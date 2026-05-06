@@ -84,6 +84,12 @@ export interface AlbumProcessedEvent {
   status: AlbumStatus;
 }
 
+export interface HealthResponse {
+  ok: boolean;
+  spotify?: boolean;
+  ytmusic?: boolean;
+}
+
 export type MigrationEvent =
   | PlaylistsDiscoveredEvent
   | PlaylistStartedEvent
