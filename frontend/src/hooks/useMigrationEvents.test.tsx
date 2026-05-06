@@ -45,6 +45,11 @@ class MockWebSocket {
     this.readyState = 3;
     this.onclose?.(new CloseEvent('close'));
   }
+
+  _closeClean() {
+    this.readyState = 3;
+    this.onclose?.(new CloseEvent('close', { code: 1000, wasClean: true }));
+  }
 }
 
 beforeEach(() => {
@@ -92,6 +97,20 @@ describe('useMigrationEvents', () => {
     expect(MockWebSocket.instances).toHaveLength(0);
     expect(result.current.state).toBe('closed');
     expect(result.current.events).toEqual([]);
+  });
+
+  it('does not reconnect when the server closes the stream cleanly (code 1000)', () => {
+    const { result } = renderHook(() => useMigrationEvents('job-clean'));
+    const socket = MockWebSocket.instances[0];
+
+    act(() => socket._open());
+    act(() => socket._closeClean());
+
+    expect(result.current.state).toBe('closed');
+    // No reconnect attempt scheduled — only the original socket exists.
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(result.current.retryCount).toBe(0);
   });
 
   it('reconnects with exponential backoff on close', () => {
