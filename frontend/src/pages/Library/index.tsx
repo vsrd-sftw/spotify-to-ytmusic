@@ -28,7 +28,7 @@ export function LibraryPage() {
   const migration = useMigrationSelection(playlistSelection.selectedIds, albumSelection.selectedIds);
 
   return (
-    <section aria-labelledby="library-heading" className="p-4 pb-20">
+    <section aria-labelledby="library-heading" className="p-4 sm:p-6 pb-20">
       <h2 id="library-heading" className="mb-4 text-xl font-semibold text-gray-900">
         Biblioteca
       </h2>

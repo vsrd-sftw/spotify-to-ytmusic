@@ -15,7 +15,7 @@ export function SelectionSummary({ playlistCount, albumCount, onMigrate }: Selec
   const label = isEmpty ? 'Ningún elemento seleccionado' : `${parts.join(', ')} seleccionado${parts.length > 1 || playlistCount + albumCount > 1 ? 's' : ''}`;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 shadow-md">
+    <div className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 shadow-md pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <span className="text-sm text-gray-600">{label}</span>
       <Button onClick={onMigrate} disabled={isEmpty}>
         Migrar

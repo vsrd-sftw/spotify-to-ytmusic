@@ -24,7 +24,7 @@ export function MigratePage() {
 
   if (migration.isEmpty && !jobId) {
     return (
-      <div className="p-4 flex flex-col items-center justify-center h-64 gap-4">
+      <div className="p-4 sm:p-6 flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-gray-600">No hay elementos seleccionados.</p>
         <button
           onClick={() => setSection('library')}
@@ -38,7 +38,7 @@ export function MigratePage() {
 
   if (jobId) {
     return (
-      <section className="p-4">
+      <section className="p-4 sm:p-6">
         <h2 className="mb-4 text-xl font-semibold text-gray-900">Migración en Progreso</h2>
         <EventLog jobId={jobId} />
       </section>
@@ -46,7 +46,7 @@ export function MigratePage() {
   }
 
   return (
-    <section className="p-4 flex flex-col gap-4">
+    <section className="p-4 sm:p-6 flex flex-col gap-4">
       <h2 className="text-xl font-semibold text-gray-900">Confirmar Migración</h2>
       <div className="text-gray-700">
         <p>¿Confirmas que quieres migrar?</p>
