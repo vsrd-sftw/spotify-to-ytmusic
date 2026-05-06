@@ -68,6 +68,7 @@ class MissingItem:
 
 @dataclass
 class MigrationReport:
+    id: str | None = None
     playlists: list[PlaylistMigrationResult] = field(default_factory=list)
     albums: list[AlbumMigrationResult] = field(default_factory=list)
     not_found: list[MissingItem] = field(default_factory=list)
