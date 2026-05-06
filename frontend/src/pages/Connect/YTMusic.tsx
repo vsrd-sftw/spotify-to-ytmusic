@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Button, Label, Textarea } from '@/components/ui';
+import { Button, FieldError, Label, Textarea } from '@/components/ui';
+import { useYTMusicAuth } from '@/features/auth/useYTMusicAuth';
 
 export function YTMusicConnect() {
   const [headers, setHeaders] = useState('');
+  const { state, errorMessage, connect } = useYTMusicAuth();
 
   return (
     <section aria-labelledby="ytmusic-connect-heading" className="flex flex-col gap-4 p-8">
@@ -29,10 +31,17 @@ export function YTMusicConnect() {
           placeholder="Pega aquí los headers copiados de DevTools..."
         />
       </div>
-      <div>
-        <Button disabled={headers.trim().length === 0}>
-          Conectar con YouTube Music
-        </Button>
+      <div className="flex flex-col gap-2">
+        <div>
+          <Button
+            onClick={() => connect(headers)}
+            disabled={headers.trim().length === 0 || state === 'submitting' || state === 'success'}
+            loading={state === 'submitting'}
+          >
+            Conectar con YouTube Music
+          </Button>
+        </div>
+        {errorMessage && <FieldError>{errorMessage}</FieldError>}
       </div>
     </section>
   );
