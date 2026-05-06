@@ -35,6 +35,15 @@ jobs:
       - run: pnpm exec tsc --noEmit
         working-directory: frontend
 
+      - name: Verify generated API types are in sync
+        run: |
+          if command -v curl &> /dev/null && curl -sf http://localhost:8000/openapi.json > /dev/null 2>&1; then
+            pnpm run gen:api:check
+          else
+            echo "Backend not running, skipping gen:api:check"
+          fi
+        working-directory: frontend
+
       - run: pnpm test
         working-directory: frontend
 

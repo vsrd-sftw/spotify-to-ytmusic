@@ -1,8 +1,7 @@
 # Frontend
 
-Interfaz web para `spotify-to-ytmusic`. Habla con el backend (cuando
-exista, ver issues #67–#71) vía HTTP + WebSocket bajo el prefijo
-`/api`. Mientras tanto, **todas las llamadas las sirve MSW**.
+Interfaz web para `spotify-to-ytmusic`. Habla con el backend FastAPI vía
+HTTP + WebSocket bajo el prefijo `/api`.
 
 ## Stack
 
@@ -11,7 +10,7 @@ exista, ver issues #67–#71) vía HTTP + WebSocket bajo el prefijo
   `/migrate`, `/reports`, `/reports/:id`)
 - **TanStack Query 5** para estado HTTP
 - **TailwindCSS 3** para estilos
-- **MSW 2** para mockear el backend mientras no exista
+- **MSW 2** para mockear el backend (modo offline)
 - **Vitest** + **Testing Library** para tests
 - WebSocket nativo con reconexión exponencial
 
@@ -22,9 +21,8 @@ pnpm install
 pnpm dev
 ```
 
-Abre http://localhost:5173. La app arranca el worker MSW y todo el
-tráfico `*/api/*` lo intercepta — verás la UI completamente funcional
-contra fixtures.
+Abre http://localhost:5173. Por defecto la app arranca contra los
+mocks de MSW — verás la UI completamente funcional contra fixtures.
 
 > **Importante:** usa `pnpm`, no `npm`. `pnpm-lock.yaml` es la fuente
 > de verdad. Algunos paquetes (`msw`) provocan crashes en npm 11.x.
@@ -39,12 +37,63 @@ contra fixtures.
 | `pnpm format` / `format:check` | Prettier |
 | `pnpm test` | Vitest en watch mode |
 | `pnpm test:run` | Vitest una pasada (lo que corre CI) |
+| `pnpm gen:api` | Genera `src/types/api.gen.ts` desde el OpenAPI del backend |
+| `pnpm gen:api:check` | CI check: falla si el generado no coincide con el commiteado |
+
+## Modos de desarrollo
+
+La app puede correr en dos modos:
+
+### Modo MSW (offline, por defecto)
+
+Todo el tráfico `*/api/*` lo intercepta MSW con fixtures. No necesitas
+el backend corriendo.
+
+```bash
+# .env.development tiene VITE_USE_MSW=true por defecto
+pnpm dev
+```
+
+### Modo backend real
+
+Las peticiones se envían al backend FastAPI a través del proxy de Vite
+(`localhost:8000`).
+
+```bash
+# 1. Arranca el backend
+cd ../backend && python -m spotify_to_ytmusic.api.server
+
+# 2. En otra terminal, desactiva MSW y arranca el frontend
+cd frontend
+echo 'VITE_USE_MSW=false' > .env.development.local
+pnpm dev
+```
+
+O edita `.env.development` y pon `VITE_USE_MSW=false` directamente.
+
+El proxy de Vite (`vite.config.ts`) redirige:
+- `/api` → `http://localhost:8000` (HTTP)
+- `/api/migrate` → `http://localhost:8000` con WebSocket
+
+### Generar tipos desde OpenAPI
+
+Los tipos TS se generan automáticamente desde el schema OpenAPI del
+backend:
+
+```bash
+# Con el backend corriendo en localhost:8000
+pnpm gen:api
+```
+
+Esto actualiza `src/types/api.gen.ts` (commiteado). El archivo
+`src/types/api.ts` re-exporta los tipos generados y mantiene manualmente
+sólo los tipos de eventos WebSocket que OpenAPI no cubre.
 
 ## Arquitectura
 
 ```
 src/
-├── main.tsx              # MSW + ErrorBoundary + BrowserRouter + QueryClient
+├── main.tsx              # MSW (conditional) + ErrorBoundary + BrowserRouter + QueryClient
 ├── App.tsx               # <Routes> dentro de <SelectionProvider>
 ├── pages/                # Una carpeta por ruta top-level
 │   ├── Connect/          # Spotify + YT Music
@@ -72,7 +121,9 @@ src/
 │   ├── query-client.ts   # TanStack Query client
 │   ├── download.ts       # Descarga blob → JSON
 │   └── ToastContext.tsx
-├── types/api.ts          # Espejo manual de los modelos del backend (será generado desde OpenAPI en #71)
+├── types/
+│   ├── api.gen.ts        # Generado desde OpenAPI (pnpm gen:api)
+│   └── api.ts            # Re-exporta api.gen.ts + tipos manuales de eventos WS
 └── test/
     ├── setup.ts          # Vitest + MSW lifecycle
     └── msw/              # handlers, fixtures, server (Node), browser (worker)
@@ -115,19 +166,7 @@ http.get('*/api/playlists', () => HttpResponse.json([...]))
 http.get('/api/playlists', () => HttpResponse.json([...]))
 ```
 
-### Conmutar a backend real
-
-Cuando el FastAPI exista (issues #67–#70 + proxy en #71):
-
-1. `vite.config.ts` ganará un `server.proxy` apuntando `/api` al puerto
-   del backend.
-2. `main.tsx` arrancará MSW solo si `VITE_USE_MSW=true`. Sin esa flag,
-   las peticiones se irán al backend a través del proxy.
-
-Hasta entonces, MSW siempre está ON en desarrollo y hay que vivir con
-los fixtures.
-
-## Contrato con el backend
+### Contrato con el backend
 
 | Method | Path | Quién lo consume |
 | ------ | ---- | ---------------- |
@@ -141,8 +180,10 @@ los fixtures.
 | `GET` | `/api/reports` | `useReports` |
 | `GET` | `/api/reports/:id` | `useReport` |
 
-Los tipos espejo del backend están en [`src/types/api.ts`](src/types/api.ts).
-La generación automática desde `/openapi.json` la cubre la issue #71.
+Los tipos del backend se generan desde `/openapi.json` en
+[`src/types/api.gen.ts`](src/types/api.gen.ts) via `pnpm gen:api`.
+[`src/types/api.ts`](src/types/api.ts) re-exporta los generados y
+mantiene a mano sólo los tipos de eventos WS.
 
 ## Tests
 

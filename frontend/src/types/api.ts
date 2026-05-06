@@ -1,57 +1,37 @@
-export interface Track {
-  name: string;
-  artist: string;
-  album: string;
-  durationMs: number;
-  spotifyId: string;
-}
+export type {
+  paths,
+  components,
+  operations,
+} from './api.gen';
 
-export interface Playlist {
-  id: string;
-  name: string;
-  description: string;
-  tracks: Track[];
-}
+import type { components } from './api.gen';
 
-export interface PlaylistSummary {
-  id: string;
-  name: string;
-  description: string;
-  trackCount: number;
-  ownerId: string;
-  isOwn: boolean;
-}
-
-export interface Album {
-  name: string;
-  artist: string;
-  spotifyId: string;
-}
-
-export interface PlaylistMigrationResult {
-  name: string;
-  total: number;
-  found: number;
-  ytPlaylistId: string | null;
-}
+export type HealthResponse = components['schemas']['HealthResponse'];
+export type AuthUrlResponse = components['schemas']['AuthUrlResponse'];
+export type OkResponse = components['schemas']['OkResponse'];
+export type ErrorResponse = components['schemas']['ErrorResponse'];
+export type PlaylistSummaryResponse = components['schemas']['PlaylistSummaryResponse'];
+export type AlbumResponse = components['schemas']['AlbumResponse'];
+export type PlaylistMigrationResultResponse = components['schemas']['PlaylistMigrationResultResponse'];
+export type AlbumMigrationResultResponse = components['schemas']['AlbumMigrationResultResponse'];
+export type MissingItemResponse = components['schemas']['MissingItemResponse'];
+export type ReportSummaryResponse = components['schemas']['ReportSummaryResponse'];
+export type ReportDetailResponse = components['schemas']['ReportDetailResponse'];
+export type MigrateRequest = components['schemas']['MigrateRequest'];
+export type MigrateResponse = components['schemas']['MigrateResponse'];
+export type HTTPValidationError = components['schemas']['HTTPValidationError'];
+export type ValidationError = components['schemas']['ValidationError'];
 
 export type AlbumStatus = 'saved' | 'found (not saved)' | 'not found';
 
-export interface AlbumMigrationResult {
-  label: string;
-  status: AlbumStatus;
-}
-
-export interface MissingItem {
-  context: string;
-  item: string;
-}
+export type PlaylistSummary = components['schemas']['PlaylistSummaryResponse'];
+export type Album = components['schemas']['AlbumResponse'];
 
 export interface MigrationReport {
   id?: string;
-  playlists: PlaylistMigrationResult[];
-  albums: AlbumMigrationResult[];
-  notFound: MissingItem[];
+  playlists: PlaylistMigrationResultResponse[];
+  albums: AlbumMigrationResultResponse[];
+  notFound: MissingItemResponse[];
 }
 
 export interface PlaylistsDiscoveredEvent {
@@ -107,12 +87,6 @@ export interface AlbumSaveFailedEvent {
 export interface MigrationFinishedEvent {
   type: 'MigrationFinished';
   reportId: string;
-}
-
-export interface HealthResponse {
-  ok: boolean;
-  spotify?: boolean;
-  ytmusic?: boolean;
 }
 
 export type MigrationEvent =
