@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { resolveWsUrl } from '@/lib/ws';
+import { resolveWsUrl, WsConnection } from '@/lib/ws';
+import type { WsConnectionState } from '@/lib/ws';
 import type { MigrationEvent } from '@/types/api';
 
-export type WsState = 'connecting' | 'open' | 'closed' | 'error';
+export type WsState = WsConnectionState;
 
 export interface UseMigrationEventsResult {
   events: MigrationEvent[];
   state: WsState;
   close: () => void;
+  retry: () => void;
+  retryCount: number;
 }
 
 export function useMigrationEvents(
@@ -15,33 +18,46 @@ export function useMigrationEvents(
 ): UseMigrationEventsResult {
   const [events, setEvents] = useState<MigrationEvent[]>([]);
   const [state, setState] = useState<WsState>(jobId ? 'connecting' : 'closed');
-  const socketRef = useRef<WebSocket | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const connRef = useRef<WsConnection | null>(null);
 
   useEffect(() => {
     if (!jobId) return;
 
-    const socket = new WebSocket(
+    const conn = new WsConnection(
       resolveWsUrl(`/migrate/${jobId}/events`),
     );
-    socketRef.current = socket;
 
-    socket.onopen = () => setState('open');
-    socket.onmessage = (ev: MessageEvent) => {
-      const parsed = JSON.parse(ev.data) as MigrationEvent;
+    conn.onMessage = (raw: unknown) => {
+      const parsed = JSON.parse(String(raw)) as MigrationEvent;
       setEvents((prev) => [...prev, parsed]);
     };
-    socket.onerror = () => setState('error');
-    socket.onclose = () => setState('closed');
+
+    conn.onStateChange = (newState: WsConnectionState) => {
+      setState(newState);
+      setRetryCount(conn.getRetryCount());
+    };
+
+    connRef.current = conn;
+    conn.connect();
 
     return () => {
-      socketRef.current = null;
-      socket.close();
+      connRef.current = null;
+      conn.close();
     };
   }, [jobId]);
 
   const close = useCallback(() => {
-    socketRef.current?.close();
+    connRef.current?.close();
   }, []);
 
-  return { events, state, close };
+  const retry = useCallback(() => {
+    const conn = connRef.current;
+    if (!conn) return;
+    conn.resetRetry();
+    setRetryCount(0);
+    conn.connect();
+  }, []);
+
+  return { events, state, close, retry, retryCount };
 }

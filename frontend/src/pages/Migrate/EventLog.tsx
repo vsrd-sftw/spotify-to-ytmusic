@@ -5,6 +5,7 @@ import { useNotFoundItems } from '@/features/migrate/useNotFoundItems';
 import { useMigrationSummary } from '@/features/migrate/useMigrationSummary';
 import { NotFound } from '@/components/Migrate/NotFound';
 import { CompletionSummary } from '@/components/Migrate/CompletionSummary';
+import { ConnectionBanner } from '@/components/Migrate/ConnectionBanner';
 import type { WsState } from '@/hooks/useMigrationEvents';
 import type { MigrationEvent } from '@/types/api';
 
@@ -17,6 +18,8 @@ const stateLabels: Record<WsState, string> = {
   open: 'En vivo',
   closed: 'Cerrado',
   error: 'Error de conexión',
+  reconnecting: 'Reconectando...',
+  exhausted: 'Conexión perdida',
 };
 
 const stateColors: Record<WsState, string> = {
@@ -24,6 +27,8 @@ const stateColors: Record<WsState, string> = {
   open: 'bg-green-100 text-green-800',
   closed: 'bg-gray-100 text-gray-600',
   error: 'bg-red-100 text-red-800',
+  reconnecting: 'bg-yellow-100 text-yellow-800',
+  exhausted: 'bg-red-100 text-red-800',
 };
 
 function formatEvent(event: MigrationEvent): string {
@@ -52,7 +57,7 @@ function formatEvent(event: MigrationEvent): string {
 }
 
 export function EventLog({ jobId }: EventLogProps) {
-  const { events, state } = useMigrationEvents(jobId);
+  const { events, state, retry, retryCount } = useMigrationEvents(jobId);
   const containerRef = useRef<HTMLDivElement>(null);
   const { setSection } = useAppSection();
   const { labels } = useNotFoundItems(events);
@@ -65,6 +70,7 @@ export function EventLog({ jobId }: EventLogProps) {
   }, [events]);
 
   const isClosedCleanly = state === 'closed' && events.length > 0;
+  const isReconnecting = state === 'reconnecting' || state === 'exhausted';
 
   return (
     <div className="flex flex-col gap-2">
@@ -74,11 +80,12 @@ export function EventLog({ jobId }: EventLogProps) {
           {stateLabels[state]}
         </span>
       </div>
+      <ConnectionBanner state={state} retryCount={retryCount} onRetry={retry} />
       <div
         ref={containerRef}
         className="h-64 overflow-y-auto bg-gray-50 border rounded-md p-3 font-mono text-sm"
       >
-        {events.length === 0 ? (
+        {events.length === 0 && !isReconnecting ? (
           <span className="text-gray-400">Esperando eventos...</span>
         ) : (
           events.map((event, idx) => (

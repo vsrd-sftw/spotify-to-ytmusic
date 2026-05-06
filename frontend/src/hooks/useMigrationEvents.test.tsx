@@ -32,15 +32,26 @@ class MockWebSocket {
       new MessageEvent('message', { data: JSON.stringify(data) }),
     );
   }
+
+  _error() {
+    this.onerror?.(new Event('error'));
+  }
+
+  _close() {
+    this.readyState = 3;
+    this.onclose?.(new CloseEvent('close'));
+  }
 }
 
 beforeEach(() => {
   MockWebSocket.instances = [];
+  vi.useFakeTimers();
   vi.stubGlobal('WebSocket', MockWebSocket);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('useMigrationEvents', () => {
@@ -77,5 +88,59 @@ describe('useMigrationEvents', () => {
     expect(MockWebSocket.instances).toHaveLength(0);
     expect(result.current.state).toBe('closed');
     expect(result.current.events).toEqual([]);
+  });
+
+  it('reconnects with exponential backoff on close', () => {
+    const { result } = renderHook(() => useMigrationEvents('job-3'));
+    const socket1 = MockWebSocket.instances[0];
+
+    act(() => socket1._close());
+    expect(result.current.state).toBe('reconnecting');
+
+    act(() => vi.advanceTimersByTime(1000));
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const socket2 = MockWebSocket.instances[1];
+    act(() => socket2._open());
+
+    expect(result.current.state).toBe('open');
+    expect(result.current.retryCount).toBe(0);
+  });
+
+  it('stops retrying after max retries and reports exhausted', () => {
+    const { result } = renderHook(() => useMigrationEvents('job-4'));
+
+    const delays = [1000, 2000, 4000, 8000];
+
+    for (let i = 0; i < 4; i++) {
+      const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+      act(() => socket._close());
+      expect(result.current.state).toBe('reconnecting');
+      act(() => vi.advanceTimersByTime(delays[i]));
+    }
+
+    const lastSocket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    act(() => lastSocket._close());
+    expect(result.current.state).toBe('exhausted');
+    expect(result.current.retryCount).toBe(5);
+  });
+
+  it('resets backoff on manual retry', () => {
+    const { result } = renderHook(() => useMigrationEvents('job-5'));
+    const socket1 = MockWebSocket.instances[0];
+
+    act(() => socket1._close());
+    act(() => vi.advanceTimersByTime(1000));
+
+    const socket2 = MockWebSocket.instances[1];
+    act(() => socket2._close());
+
+    expect(result.current.state).toBe('reconnecting');
+    expect(result.current.retryCount).toBe(2);
+
+    act(() => result.current.retry());
+
+    expect(result.current.retryCount).toBe(0);
+    expect(result.current.state).toBe('connecting');
   });
 });
