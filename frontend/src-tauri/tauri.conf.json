@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicknaming/Tauri-2.0/refs/heads/main/schema/config.schema.json",
+  "productName": "Spotify to YT Music",
+  "version": "0.2.0",
+  "identifier": "com.spotify-to-ytmusic.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "title": "Spotify to YT Music",
+    "windows": [
+      {
+        "title": "Spotify to YT Music",
+        "width": 1024,
+        "height": 768,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/spotify-to-ytmusic-server"],
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "scope": [
+        {
+          "name": "binaries/spotify-to-ytmusic-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  },
+  "updater": {
+    "active": true,
+    "endpoints": [
+      "https://github.com/vsrd-sftw/spotify-to-ytmusic/releases/latest/download/latest.json"
+    ],
+    "pubkey": "PLACEHOLDER_UPDATE_RSA_PUBLIC_KEY",
+    "windows": {
+      "installMode": "passive"
+    }
+  }
+}

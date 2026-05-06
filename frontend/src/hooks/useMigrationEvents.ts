@@ -1,32 +1,30 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { resolveWsUrl, WsConnection } from '@/lib/ws';
-import type { WsConnectionState } from '@/lib/ws';
-import type { MigrationEvent } from '@/types/api';
-import type {
-  PlaylistProgressItem,
-} from '@/features/migrate/usePlaylistProgress';
-import type { AlbumProgressItem } from '@/features/migrate/useAlbumProgress';
-import type { MigrationSummary } from '@/features/migrate/useMigrationSummary';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { resolveWsUrl, WsConnection } from '@/lib/ws'
+import type { WsConnectionState } from '@/lib/ws'
+import type { MigrationEvent } from '@/types/api'
+import type { PlaylistProgressItem } from '@/features/migrate/usePlaylistProgress'
+import type { AlbumProgressItem } from '@/features/migrate/useAlbumProgress'
+import type { MigrationSummary } from '@/features/migrate/useMigrationSummary'
 
-export type WsState = WsConnectionState;
+export type WsState = WsConnectionState
 
 export interface MigrationDerivedState {
-  events: MigrationEvent[];
-  playlists: PlaylistProgressItem[];
-  totalPlaylistsDiscovered: number;
-  albums: AlbumProgressItem[];
-  totalAlbumsDiscovered: number;
-  savedCount: number;
-  foundCount: number;
-  notFoundLabels: string[];
-  summary: MigrationSummary;
+  events: MigrationEvent[]
+  playlists: PlaylistProgressItem[]
+  totalPlaylistsDiscovered: number
+  albums: AlbumProgressItem[]
+  totalAlbumsDiscovered: number
+  savedCount: number
+  foundCount: number
+  notFoundLabels: string[]
+  summary: MigrationSummary
 }
 
 export interface UseMigrationEventsResult extends MigrationDerivedState {
-  state: WsState;
-  close: () => void;
-  retry: () => void;
-  retryCount: number;
+  state: WsState
+  close: () => void
+  retry: () => void
+  retryCount: number
 }
 
 const initialState: MigrationDerivedState = {
@@ -45,7 +43,7 @@ const initialState: MigrationDerivedState = {
     albumsTotal: 0,
     notFoundCount: 0,
   },
-};
+}
 
 // Incremental reducer: each event mutates the derived state in O(playlists)
 // (in practice tiny) instead of O(N) over the full event log.
@@ -53,7 +51,7 @@ export function migrationReducer(
   state: MigrationDerivedState,
   event: MigrationEvent,
 ): MigrationDerivedState {
-  const events = [...state.events, event];
+  const events = [...state.events, event]
 
   switch (event.type) {
     case 'PlaylistsDiscovered':
@@ -67,12 +65,12 @@ export function migrationReducer(
           tracksTotal: 0,
           tracksFound: 0,
         },
-      };
+      }
 
     case 'PlaylistStarted': {
-      const idx = state.playlists.findIndex((p) => p.name === event.name);
-      let nextPlaylists: PlaylistProgressItem[];
-      let trackDelta: number;
+      const idx = state.playlists.findIndex((p) => p.name === event.name)
+      let nextPlaylists: PlaylistProgressItem[]
+      let trackDelta: number
       if (idx === -1) {
         nextPlaylists = [
           ...state.playlists,
@@ -82,15 +80,15 @@ export function migrationReducer(
             found: 0,
             total: event.trackCount,
           },
-        ];
-        trackDelta = event.trackCount;
+        ]
+        trackDelta = event.trackCount
       } else {
-        const prev = state.playlists[idx];
-        const prevTotal = prev.total;
+        const prev = state.playlists[idx]
+        const prevTotal = prev.total
         nextPlaylists = state.playlists.map((p, i) =>
           i === idx ? { ...p, status: 'in_progress', total: event.trackCount } : p,
-        );
-        trackDelta = event.trackCount - prevTotal;
+        )
+        trackDelta = event.trackCount - prevTotal
       }
       return {
         ...state,
@@ -100,11 +98,11 @@ export function migrationReducer(
           ...state.summary,
           tracksTotal: state.summary.tracksTotal + trackDelta,
         },
-      };
+      }
     }
 
     case 'PlaylistFinished': {
-      const idx = state.playlists.findIndex((p) => p.name === event.name);
+      const idx = state.playlists.findIndex((p) => p.name === event.name)
       const nextPlaylists =
         idx === -1
           ? state.playlists
@@ -117,7 +115,7 @@ export function migrationReducer(
                     total: event.total,
                   }
                 : p,
-            );
+            )
       return {
         ...state,
         events,
@@ -128,7 +126,7 @@ export function migrationReducer(
           tracksFound: state.summary.tracksFound + event.found,
           notFoundCount: state.summary.notFoundCount + event.notFoundLabels.length,
         },
-      };
+      }
     }
 
     case 'AlbumsDiscovered':
@@ -149,24 +147,24 @@ export function migrationReducer(
           // running notFoundCount that the album loop will re-tally.
           notFoundCount: 0,
         },
-      };
+      }
 
     case 'AlbumProcessed': {
-      const albums = [...state.albums, { label: event.label, status: event.status }];
-      let savedCount = state.savedCount;
-      let foundCount = state.foundCount;
-      let albumsFound = state.summary.albumsFound;
-      let notFoundCount = state.summary.notFoundCount;
-      const notFoundLabels = [...state.notFoundLabels];
+      const albums = [...state.albums, { label: event.label, status: event.status }]
+      let savedCount = state.savedCount
+      let foundCount = state.foundCount
+      let albumsFound = state.summary.albumsFound
+      let notFoundCount = state.summary.notFoundCount
+      const notFoundLabels = [...state.notFoundLabels]
       if (event.status === 'saved') {
-        savedCount += 1;
-        albumsFound += 1;
+        savedCount += 1
+        albumsFound += 1
       } else if (event.status === 'found (not saved)') {
-        foundCount += 1;
-        albumsFound += 1;
+        foundCount += 1
+        albumsFound += 1
       } else if (event.status === 'not found') {
-        notFoundCount += 1;
-        notFoundLabels.push(event.label);
+        notFoundCount += 1
+        notFoundLabels.push(event.label)
       }
       return {
         ...state,
@@ -180,68 +178,72 @@ export function migrationReducer(
           albumsFound,
           notFoundCount,
         },
-      };
+      }
     }
 
     case 'PlaylistCreationFailed':
     case 'PlaylistChunkFailed':
     case 'AlbumSaveFailed':
     case 'MigrationFinished':
-      return { ...state, events };
+      return { ...state, events }
   }
 }
 
-export function useMigrationEvents(
-  jobId: string | null,
-): UseMigrationEventsResult {
-  const [derived, dispatch] = useReducer(migrationReducer, initialState);
-  const [state, setState] = useState<WsState>(jobId ? 'connecting' : 'closed');
-  const [retryCount, setRetryCount] = useState(0);
-  const connRef = useRef<WsConnection | null>(null);
+export function useMigrationEvents(jobId: string | null): UseMigrationEventsResult {
+  const [derived, dispatch] = useReducer(migrationReducer, initialState)
+  const [state, setState] = useState<WsState>(jobId ? 'connecting' : 'closed')
+  const [retryCount, setRetryCount] = useState(0)
+  const connRef = useRef<WsConnection | null>(null)
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!jobId) return
 
-    const conn = new WsConnection(
-      resolveWsUrl(`/migrate/${jobId}/events`),
-    );
+    let cancelled = false
+    const connRefLocal: { current: WsConnection | null } = { current: null }
 
-    conn.onMessage = (raw: unknown) => {
-      let parsed: MigrationEvent;
-      try {
-        parsed = JSON.parse(String(raw)) as MigrationEvent;
-      } catch (err) {
-        console.warn('useMigrationEvents: malformed WS message', err);
-        return;
+    resolveWsUrl(`/migrate/${jobId}/events`).then((url) => {
+      if (cancelled) return
+      const conn = new WsConnection(url)
+
+      conn.onMessage = (raw: unknown) => {
+        let parsed: MigrationEvent
+        try {
+          parsed = JSON.parse(String(raw)) as MigrationEvent
+        } catch (err) {
+          console.warn('useMigrationEvents: malformed WS message', err)
+          return
+        }
+        dispatch(parsed)
       }
-      dispatch(parsed);
-    };
 
-    conn.onStateChange = (newState: WsConnectionState) => {
-      setState(newState);
-      setRetryCount(conn.getRetryCount());
-    };
+      conn.onStateChange = (newState: WsConnectionState) => {
+        setState(newState)
+        setRetryCount(conn.getRetryCount())
+      }
 
-    connRef.current = conn;
-    conn.connect();
+      connRef.current = conn
+      connRefLocal.current = conn
+      conn.connect()
+    })
 
     return () => {
-      connRef.current = null;
-      conn.close();
-    };
-  }, [jobId]);
+      cancelled = true
+      connRefLocal.current?.close()
+      connRef.current = null
+    }
+  }, [jobId])
 
   const close = useCallback(() => {
-    connRef.current?.close();
-  }, []);
+    connRef.current?.close()
+  }, [])
 
   const retry = useCallback(() => {
-    const conn = connRef.current;
-    if (!conn) return;
-    conn.resetRetry();
-    setRetryCount(0);
-    conn.connect();
-  }, []);
+    const conn = connRef.current
+    if (!conn) return
+    conn.resetRetry()
+    setRetryCount(0)
+    conn.connect()
+  }, [])
 
   return {
     ...derived,
@@ -249,5 +251,5 @@ export function useMigrationEvents(
     close,
     retry,
     retryCount,
-  };
+  }
 }

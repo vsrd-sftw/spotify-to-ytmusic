@@ -1,0 +1,41 @@
+name: Build Sidecar
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-sidecar.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-sidecar.yml'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[api]" pyinstaller>=6
+        working-directory: backend
+
+      - name: Build sidecar
+        run: python scripts/build_sidecar.py
+        working-directory: backend
+
+      - name: Verify binary exists
+        shell: bash
+        run: |
+          ls -lh frontend/src-tauri/binaries/
+        working-directory: backend/..

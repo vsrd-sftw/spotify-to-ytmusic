@@ -88,8 +88,9 @@ La arquitectura está documentada en [CLAUDE.md](CLAUDE.md). En particular:
 - **Modelos de dominio**: usa los dataclasses de
   [core/models.py](backend/src/spotify_to_ytmusic/core/models.py)
   (`Track`, `Playlist`, …) en vez de pasar dicts crudos de la API.
-- **No bootstrappees** el frontend ni el módulo `api/` (FastAPI) salvo
-  que la tarea lo pida explícitamente. El proyecto es CLI-only hoy.
+- **No bootstrappees** el frontend ni módulos nuevos sin que la issue
+  lo pida explícitamente. El proyecto ya tiene scaffolding completo:
+  backend CLI, API FastAPI, frontend React, y Tauri 2 desktop.
 
 ---
 
