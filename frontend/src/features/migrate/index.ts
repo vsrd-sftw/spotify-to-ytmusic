@@ -2,3 +2,7 @@ export { useMigrationSelection } from './useMigrationSelection';
 export type { MigrationSelection } from './useMigrationSelection';
 export { useStartMigration } from './useStartMigration';
 export type { StartMigrationRequest, StartMigrationResponse } from './useStartMigration';
+export { usePlaylistProgress } from './usePlaylistProgress';
+export type { PlaylistProgressItem, PlaylistProgressStatus } from './usePlaylistProgress';
+export { useAlbumProgress } from './useAlbumProgress';
+export type { AlbumProgressItem } from './useAlbumProgress';
