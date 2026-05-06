@@ -4,26 +4,26 @@ Migrate your Spotify library to YouTube Music — playlists and saved albums inc
 
 This is a monorepo:
 
-- **`backend/`** — Python package with the migration logic and CLI. Ships
-  a working CLI today; emits typed events ready for an HTTP/WebSocket
-  transport. The FastAPI server (`api/`) is reserved for issues #67–#70.
-- **`frontend/`** — Vite + React 19 + TypeScript + TanStack Query +
-  react-router-dom 7. Full UI built page by page (Connect, Library,
-  Migrate, Reports). Currently runs against [MSW](https://mswjs.io)
-  mocks — there is no live HTTP backend yet, so OAuth, migration jobs
-  and reports listing are simulated until issues #67–#71 land.
+- **Backend:** `backend/` is a Python package with the migration logic, CLI,
+  and a FastAPI server (`api/`).
+- **Frontend:** `frontend/` is a Vite + React 19 + TypeScript + TanStack
+  Query + react-router-dom 7 app. Runs against MSW mocks in dev mode;
+  talks to the FastAPI server through a Vite proxy when it's running.
+- **Desktop app:** a [Tauri 2](https://tauri.app) wrapper that bundles the
+  frontend and the FastAPI backend (as a PyInstaller sidecar) into a
+  single native app. See [`PACKAGING.md`](PACKAGING.md).
 
 ## Status
 
 - **Working today:** the CLI (`python backend/main.py …`) does the full
   Spotify → YouTube Music migration end-to-end and writes a JSON report.
-- **Working in dev mode:** `pnpm dev` boots the frontend with MSW
-  mocking every `/api/*` call. You can navigate, select playlists,
-  trigger a "migration" (fixture event stream) and download a fixture
-  report. None of it talks to a real server.
-- **Next big block of work:** issues #67–#71 (FastAPI server + OpenAPI
-  types + Vite proxy). After that, #72–#74 wrap everything in a Tauri 2
-  desktop app.
+- **Working in dev mode:** `pnpm dev` boots the frontend. When the FastAPI
+  backend is running (`python -m spotify_to_ytmusic.api.server`), the Vite
+  proxy connects the frontend to real API endpoints. Without the backend,
+  MSW mocks every `/api/*` call.
+- **Desktop app:** Tauri 2 scaffold + PyInstaller sidecar are in place
+  (issues #72–#74). Run `cd frontend && pnpm tauri dev` for development,
+  `pnpm tauri build` for production bundles.
 
 ## Features
 
@@ -73,13 +73,21 @@ For frontend plans and the backend API contract, see
 ```
 spotify-to-ytmusic/
 ├── README.md                       # You are here
+├── CONTRIBUTING.md                 # Contributor guidelines (DoD, process, style)
+├── PACKAGING.md                    # Sidecar and Tauri build instructions
+├── CLAUDE.md                       # Agent context (gotchas, conventions)
 ├── .gitignore
+├── docs/
+│   └── oauth-desktop.md            # Desktop OAuth strategy decisions
 ├── backend/
 │   ├── pyproject.toml              # Installable package definition
-│   ├── requirements.txt            # Pinned runtime deps (subset of pyproject)
+│   ├── requirements.txt            # Pinned runtime deps
+│   ├── spotify-to-ytmusic-server.spec  # PyInstaller spec for the sidecar
 │   ├── .env / .env.example         # Spotify credentials
 │   ├── main.py                     # CLI entry point
 │   ├── setup_ytmusic.py            # YouTube Music browser auth setup
+│   ├── scripts/
+│   │   └── build_sidecar.py        # PyInstaller build script
 │   ├── data/                       # Runtime state (gitignored)
 │   │   ├── browser.json
 │   │   ├── .cache                  # Spotify OAuth token cache
@@ -101,24 +109,82 @@ spotify-to-ytmusic/
 │           │   └── report.py       # JSON report serialization
 │           ├── cli/                # Console entry point
 │           │   └── __init__.py
-│           └── api/                # (planned) FastAPI app — see #67
-│               └── __init__.py
-└── frontend/
-    ├── package.json                # pnpm workspace
-    ├── vite.config.ts
-    ├── public/mockServiceWorker.js # MSW worker (committed)
-    └── src/
-        ├── main.tsx                # MSW + ErrorBoundary + BrowserRouter
-        ├── App.tsx                 # <Routes> for /connect /library /migrate /reports
-        ├── pages/                  # One folder per top-level route
-        ├── components/{layout,ui,library,migrate}/
-        ├── features/{auth,library,migrate,reports}/   # TanStack Query hooks
-        ├── contexts/SelectionContext.tsx              # Cross-page selection
-        ├── hooks/                  # useAutoFocusHeading, useFocusTrap, useMigrationEvents
-        ├── lib/                    # http (timeout-aware), ws, query-client
-        ├── types/api.ts            # Hand-mirrored TS types (will be generated from OpenAPI in #71)
-        └── test/msw/               # Handlers, fixtures, server, browser worker
+│           └── api/                # FastAPI server
+│               ├── __init__.py     # create_app() factory + CORS
+│               ├── server.py       # Dev entrypoint (uvicorn on :8000)
+│               ├── sidecar_server.py  # Tauri sidecar entrypoint
+│               ├── models.py       # Pydantic response models (camelCase)
+│               ├── state.py        # In-memory OAuth state (TTL-based)
+│               ├── jobs.py         # In-memory migration job manager
+│               ├── dependencies.py # FastAPI dependencies
+│               ├── serialization.py
+│               └── routes/         # /auth, /health, /library, /migrate, /reports
+├── frontend/
+│   ├── package.json                # pnpm workspace + Tauri deps
+│   ├── vite.config.ts
+│   ├── public/mockServiceWorker.js # MSW worker (committed)
+│   ├── src-tauri/                  # Tauri 2 desktop app
+│   │   ├── Cargo.toml
+│   │   ├── tauri.conf.json
+│   │   ├── capabilities/default.json
+│   │   ├── binaries/               # Sidecar binaries (built, gitignored)
+│   │   └── src/
+│   │       ├── main.rs             # Tauri entry point
+│   │       └── lib.rs              # Sidecar spawning + commands
+│   └── src/
+│       ├── main.tsx                # MSW + ErrorBoundary + BrowserRouter
+│       ├── App.tsx                 # <Routes> for /connect /library /migrate /reports
+│       ├── pages/                  # One folder per top-level route
+│       ├── components/{layout,ui,library,migrate}/
+│       ├── features/{auth,library,migrate,reports}/   # TanStack Query hooks
+│       ├── contexts/SelectionContext.tsx              # Cross-page selection
+│       ├── hooks/                  # useAutoFocusHeading, useFocusTrap, useMigrationEvents
+│       ├── lib/                    # http (timeout-aware), ws, tauri, query-client
+│       ├── types/api.gen.ts        # Generated from OpenAPI (pnpm gen:api)
+│       └── test/msw/               # Handlers, fixtures, server, browser worker
+├── .github/workflows/
+│   ├── backend-tests.yml
+│   ├── frontend-ci.yml
+│   ├── build-sidecar.yml           # PyInstaller sidecar CI
+│   └── release.yml                 # Tag-driven desktop release
+└── scripts/
+    └── generate-updater-keypair.sh # Ed25519 keypair for auto-updater
 ```
+
+## Desktop app
+
+A Tauri 2 wrapper bundles the frontend and backend into a native desktop
+application. The Python backend is compiled to a standalone binary via
+PyInstaller and spawned as a sidecar.
+
+```bash
+# Development
+cd frontend && pnpm tauri dev
+
+# Production build (outputs .msi / .deb / .AppImage)
+cd frontend && pnpm tauri build
+```
+
+### Data persistence
+
+The app stores the following files in the platform's standard app data
+directory (set via `SPOTIFY_TO_YTMUSIC_DATA_DIR`):
+
+| File | Purpose |
+|------|---------|
+| `browser.json` | YouTube Music authentication headers |
+| `.cache` | Spotify OAuth token |
+| `track_cache.json` | Persistent YouTube Music search cache |
+| `migration_report_*.json` | Migration reports |
+
+On Linux, `.cache` and `browser.json` are restricted to `0o600` permissions.
+
+### Auto-updater
+
+The app checks for updates at startup against GitHub Releases. Releases
+are signed with an Ed25519 keypair. See
+[`scripts/generate-updater-keypair.sh`](scripts/generate-updater-keypair.sh)
+for keypair generation instructions.
 
 ## License
 

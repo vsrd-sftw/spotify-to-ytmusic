@@ -14,22 +14,27 @@ from spotify_to_ytmusic.core.config import (
 router = APIRouter(prefix="/api")
 
 
-def _get_spotify_oauth(state: str | None = None):
-    """Create a SpotifyOAuth instance without opening a browser."""
+def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None):
+    """Create a SpotifyOAuth instance without opening a browser.
+
+    `redirect_uri` overrides the default from ``SPOTIFY_REDIRECT_URI``.
+    This is used by the desktop flow so the sidecar can assemble the
+    callback URL from its dynamically assigned port.
+    """
     import os
     from spotipy.oauth2 import SpotifyOAuth
     from spotify_to_ytmusic.core.config import SPOTIFY_SCOPES
 
     client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "")
-    redirect_uri = os.getenv(
+    effective_redirect = redirect_uri or os.getenv(
         "SPOTIFY_REDIRECT_URI",
         "http://127.0.0.1:8000/api/auth/spotify/callback",
     )
     return SpotifyOAuth(
         client_id=client_id,
         client_secret=client_secret,
-        redirect_uri=redirect_uri,
+        redirect_uri=effective_redirect,
         scope=SPOTIFY_SCOPES,
         cache_path=SPOTIFY_TOKEN_CACHE_FILE,
         state=state,
@@ -37,12 +42,28 @@ def _get_spotify_oauth(state: str | None = None):
 
 
 @router.post("/auth/spotify")
-async def auth_spotify() -> AuthUrlResponse | ErrorResponse:
+async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
     state = secrets.token_urlsafe(32)
-    state_store.set(state, ttl_seconds=600)
-    oauth = _get_spotify_oauth(state=state)
+    state_store.set(state, ttl_seconds=300)
+    redirect_uri = _resolve_redirect_uri(request)
+    oauth = _get_spotify_oauth(state=state, redirect_uri=redirect_uri)
     url = oauth.get_authorize_url()
     return AuthUrlResponse(url=url)
+
+
+def _resolve_redirect_uri(request: Request) -> str | None:
+    """Return a desktop-friendly redirect URI when the request comes from Tauri.
+
+    Strategy B (primary): Tauri deep link — return ``spotify-to-ytmusic://callback``.
+    Strategy A (fallback): Fixed port — return ``http://127.0.0.1:53682/api/auth/spotify/callback``.
+
+    For non-Tauri origins (browser, Vite dev server) returns ``None`` so
+    the default ``SPOTIFY_REDIRECT_URI`` env var is used.
+    """
+    origin = request.headers.get("origin", "")
+    if origin in ("tauri://localhost", "https://tauri.localhost"):
+        return "http://127.0.0.1:53682/api/auth/spotify/callback"
+    return None
 
 
 @router.get("/auth/spotify/callback")

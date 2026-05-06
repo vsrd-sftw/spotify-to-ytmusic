@@ -1,0 +1,103 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec for the spotify-to-ytmusic sidecar (--onedir)."""
+import sys
+from pathlib import Path
+
+here = Path(SPECPATH).resolve()
+src = here / "src"
+
+a = Analysis(
+    [str(src / "spotify_to_ytmusic" / "api" / "sidecar_server.py")],
+    pathex=[str(src)],
+    binaries=[],
+    datas=[],
+    hiddenimports=[
+        "spotify_to_ytmusic",
+        "spotify_to_ytmusic.api",
+        "spotify_to_ytmusic.api.routes",
+        "spotify_to_ytmusic.api.routes.health",
+        "spotify_to_ytmusic.api.routes.auth",
+        "spotify_to_ytmusic.api.routes.library",
+        "spotify_to_ytmusic.api.routes.migrate",
+        "spotify_to_ytmusic.api.routes.reports",
+        "spotify_to_ytmusic.core",
+        "spotify_to_ytmusic.core.config",
+        "spotify_to_ytmusic.core.events",
+        "spotify_to_ytmusic.core.models",
+        "spotify_to_ytmusic.core.migrator",
+        "spotify_to_ytmusic.core.spotify_client",
+        "spotify_to_ytmusic.core.ytmusic_client",
+        "spotify_to_ytmusic.core.track_cache",
+        "spotify_to_ytmusic.core.report",
+        "spotify_to_ytmusic.core.text",
+        "spotify_to_ytmusic.core.headers_parser",
+        "fastapi",
+        "uvicorn",
+        "uvicorn.loops",
+        "uvicorn.loops.auto",
+        "uvicorn.protocols",
+        "uvicorn.protocols.http",
+        "uvicorn.protocols.http.auto",
+        "starlette",
+        "pydantic",
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        "tkinter",
+        "matplotlib",
+        "numpy",
+        "scipy",
+        "pandas",
+        "PIL",
+        "cv2",
+        "test",
+        "pytest",
+        "unittest",
+        "email",
+        "html",
+        "http.server",
+        "xmlrpc",
+        "pdb",
+        "distutils",
+        "setuptools",
+        "pip",
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="spotify-to-ytmusic-server",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False if sys.platform == "win32" else True,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False if sys.platform == "win32" else True,
+    upx=True,
+    upx_exclude=[],
+    name="spotify-to-ytmusic-server",
+)

@@ -1,0 +1,20 @@
+[package]
+name = "spotify-to-ytmusic"
+version = "0.2.0"
+description = "Migrate your Spotify library to YouTube Music"
+authors = ["vsrd-sftw"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
