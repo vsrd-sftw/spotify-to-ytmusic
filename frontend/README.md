@@ -1,36 +1,96 @@
 # Frontend
 
-Web UI for `spotify-to-ytmusic`. Talks to the FastAPI backend in `../backend` over HTTP + WebSockets.
+Interfaz web para `spotify-to-ytmusic`. Se comunica con el backend FastAPI en `../backend` via HTTP + WebSockets.
 
-## Recommended stack
+## Stack recomendado
 
 - **Vite** + **React** + **TypeScript**
-- **TailwindCSS** for styling
-- **TanStack Query** for HTTP state
-- Native WebSocket for live migration progress
+- **TailwindCSS** para estilos
+- **TanStack Query** para estado HTTP
+- WebSocket nativo para progreso en vivo de migraciones
 
-## Bootstrap (when you're ready)
+## Inicio rápido
 
 ```bash
-cd frontend
-pnpm create vite@latest . -- --template react-ts
 pnpm install
-pnpm add -D tailwindcss postcss autoprefixer
-pnpm dlx tailwindcss init -p
+pnpm dev
 ```
 
-## Backend contract (planned)
+Abre http://localhost:5173 en tu navegador.
 
-| Method | Path                           | Purpose                          |
-| ------ | ------------------------------ | -------------------------------- |
-| `GET`  | `/api/health`                  | Liveness probe                   |
-| `POST` | `/api/auth/spotify`            | Trigger Spotify OAuth            |
-| `POST` | `/api/auth/ytmusic`            | Submit pasted browser headers    |
-| `GET`  | `/api/playlists`               | List user's Spotify playlists    |
-| `GET`  | `/api/albums`                  | List user's saved Spotify albums |
-| `POST` | `/api/migrate`                 | Start migration (returns job id) |
-| `WS`   | `/api/migrate/{job_id}/events` | Stream `MigrationEvent`s         |
-| `GET`  | `/api/reports`                 | List previous reports            |
-| `GET`  | `/api/reports/{id}`            | Fetch a report                   |
+## Scripts
 
-The backend's `Migrator` already emits typed events via `on_event` callback — the WebSocket endpoint just forwards them as JSON.
+| Script | Propósito |
+| ------ | -------- |
+| `pnpm dev` | Servidor de desarrollo con HMR |
+| `pnpm build` | Build de producción |
+| `pnpm lint` | Lint con ESLint |
+| `pnpm format` | Format con Prettier |
+| `pnpm format:check` | Verifica formato sin modificar |
+| `pnpm test` | Tests en modo watch |
+| `pnpm test:run` | Tests una vez |
+
+## Mocks (MSW)
+
+El proyecto usa **MSW** para mockear el backend durante desarrollo. Los mocks están en `src/test/msw/`.
+
+### Cómo funcionan
+
+En `src/main.tsx`, `enableMocking()` inicia el Service Worker solo en entorno de desarrollo:
+
+```tsx
+async function enableMocking() {
+  if (!import.meta.env.DEV) return
+  const { worker } = await import('@/test/msw/browser')
+  await worker.start({ onUnhandledRequest: 'bypass' })
+}
+```
+
+### Desactivar mocks
+
+Cuando el backend FastAPI esté disponible, comenta o elimina la llamada a `enableMocking()` en `src/main.tsx`:
+
+```tsx
+// Desactivar cuando haya backend real:
+// enableMocking().then(() => { ... })
+
+// Mientras tanto:
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </StrictMode>
+)
+```
+
+### Cambiar el endpoint
+
+Edita los handlers en `src/test/msw/handlers.ts` para apuntar al backend real cuando lo necesites.
+
+## Tests
+
+Ejecuta con:
+
+```bash
+pnpm test        # watch mode
+pnpm test:run    # una vez
+```
+
+Los tests usan **Vitest** + **Testing Library**. Ver `src/test/setup.ts` para la configuración.
+
+## Contrato con el backend
+
+| Method | Path | Propósito |
+| ------ | ---- | -------- |
+| `GET` | `/api/health` | Liveness probe |
+| `POST` | `/api/auth/spotify` | Trigger Spotify OAuth |
+| `POST` | `/api/auth/ytmusic` | Submit browser headers |
+| `GET` | `/api/playlists` | List playlists de Spotify |
+| `GET` | `/api/albums` | List albums guardados |
+| `POST` | `/api/migrate` | Iniciar migración |
+| `WS` | `/api/migrate/{job_id}/events` | Stream de eventos |
+| `GET` | `/api/reports` | List reportes |
+| `GET` | `/api/reports/{id}` | Ver reporte |
+
+El backend emite eventos tipados via `on_event` callback — el endpoint WebSocket los reenvía como JSON.
