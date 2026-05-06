@@ -6,13 +6,26 @@ live in `README.md` and `backend/README.md`.
 ## What this is
 
 CLI that migrates a Spotify library (playlists + saved albums) to YouTube
-Music. Monorepo: `backend/` is the Python package and CLI; `frontend/` is
-a Vite/React 19 + TanStack Query scaffolding being built incrementally
-issue-by-issue (no real UI yet, just typed contracts and MSW stubs of the
-planned API). There is also an empty `backend/src/spotify_to_ytmusic/api/`
-reserved for a future FastAPI server. **Don't expand the frontend or
-bootstrap the API server beyond what the current task asks** — there is
-no live HTTP backend today, the CLI is the only working entry point.
+Music. Monorepo:
+
+- **`backend/`** — Python package and CLI. Production-ready for the CLI
+  flow; emits typed `MigrationEvent`s ready for an HTTP/WS transport.
+- **`frontend/`** — Vite/React 19 + TanStack Query + react-router-dom 7.
+  Full UI built page by page (Connect, Library, Migrate, Reports). Talks
+  to the backend through a `*/api/...` contract that **only MSW serves
+  today** — there is no live HTTP backend yet.
+- **`backend/src/spotify_to_ytmusic/api/`** — empty placeholder reserved
+  for the FastAPI server (issues #67–#70 will fill it in).
+
+**The integration gap is the next big piece of work.** Until then:
+
+- CLI is the only end-to-end working flow (`python backend/main.py …`).
+- Frontend "works" against MSW mocks: it renders, navigates, validates
+  forms, exercises hooks/tests — but Connect doesn't actually OAuth,
+  Migrate doesn't actually run a job, and Reports list/detail are
+  fixtures, not files on disk.
+- **Don't bootstrap the FastAPI server (`api/`) unless the task explicitly
+  asks for it.** Same for new top-level frontend features.
 
 ## Where to run things
 
@@ -99,6 +112,31 @@ in git history, so check the relevant commit before "improving" any of this.
   match in the browser worker but not in Vitest's Node environment, so
   handler tests silently fall through to `onUnhandledRequest: 'error'`. See
   [handlers.ts](frontend/src/test/msw/handlers.ts).
+- **WebSocket reconnection only fires on abnormal closes.** `WsConnection.onclose`
+  short-circuits to `closed` (no reconnect) when `ev.wasClean`, `ev.code === 1000`
+  or `ev.code === 1005`. The MSW handler closes the WS cleanly after streaming
+  the fixture batch — without this guard the migrate page enters an infinite
+  reopen loop. See [ws.ts](frontend/src/lib/ws.ts) and the regression test
+  `does not reconnect when the server closes the stream cleanly` in
+  [useMigrationEvents.test.tsx](frontend/src/hooks/useMigrationEvents.test.tsx).
+- **Selection lives in `SelectionContext`, not in page-local state.** Each
+  page used to call `useSelection` independently, which silently reset the
+  user's choices when navigating Library → Migrate. Read/write through
+  [`useSelectionContext`](frontend/src/contexts/useSelectionContext.ts);
+  don't introduce new local `useState(new Set())` for picked playlists/albums.
+- **Routing is real (`react-router-dom` v7).** Use `<Link>`/`<NavLink>` and
+  `useNavigate` — don't reintroduce a `section` enum or imperative
+  `setSection` calls. Deep links like `/reports/:id` must keep working on
+  refresh.
+- **Per-page focus management uses `useAutoFocusHeading`.** The old global
+  `useEffect` in `App.tsx` that searched for any `h2/h3` was removed.
+  Each page declares its own heading `ref` and calls the hook on mount.
+  Don't reintroduce a cross-page focus side-effect.
+- **`http.ts` enforces a 15 s default timeout** via `AbortSignal.timeout`.
+  Override per call with `http.get(path, { timeoutMs })`. A timed-out
+  request rejects with a `DOMException` whose `name` is `TimeoutError`
+  (or `AbortError` if the caller aborted). Don't wrap `fetch` directly
+  from feature code — go through `http`.
 
 ## Style and conventions
 
@@ -162,14 +200,25 @@ backend/src/spotify_to_ytmusic/
         headers_parser.py                         # Browser headers → ytmusicapi
 backend/data/                                     # Runtime state, gitignored
 
-frontend/                                         # Vite + React 19 + TanStack Query
+frontend/                                         # Vite + React 19 + TanStack Query + react-router-dom 7
     public/mockServiceWorker.js                   # MSW worker (generated, committed)
     src/
-        main.tsx                                  # Boots MSW in dev, then mounts App
+        main.tsx                                  # MSW + ErrorBoundary + BrowserRouter + QueryClient
+        App.tsx                                   # <Routes> only — no section enum
         types/api.ts                              # TS mirror of backend models + events
+        contexts/                                 # SelectionContext (cross-page selection)
+        components/
+            layout/                               # AppShell, Header, Footer, ErrorBoundary, ConnectionStatus
+            ui/                                   # Button, Toast, Card, Input, Skeleton, …
+            library/                              # Tabs, SelectionSummary
+            migrate/                              # PlaylistProgress, AlbumProgress, NotFound, …
+        pages/                                    # Connect, Library, Migrate, Reports/{List,Detail}
+        features/                                 # auth/, library/, migrate/, reports/ — TanStack hooks
+        hooks/                                    # useAutoFocusHeading, useFocusTrap, useMigrationEvents
+        lib/                                      # http (timeout-aware), ws (clean-close aware), query-client, download
         test/setup.ts                             # Vitest + MSW server lifecycle
         test/msw/                                 # handlers, fixtures, server, browser
-        lib/query-client.ts                       # TanStack Query client
+backend/tests/                                    # pytest suite (migrator, ytmusic_client) — incomplete; see #66
 ```
 
 ## Plan files
@@ -177,3 +226,25 @@ frontend/                                         # Vite + React 19 + TanStack Q
 There's a plan file at `.claude/plans/` from a previous session. Check it
 for recent decisions before starting a new task — it may have context that
 hasn't made it back to the READMEs yet.
+
+## Roadmap state
+
+The backlog after the May 2026 audit is grouped into four blocks (issues
+#58–#74). State as of the last update:
+
+- **Frontend hardening (#58–#62):** all merged. Selection persists across
+  pages, react-router-dom drives navigation, per-page focus management,
+  WS reducer + rAF-coalesced scroll, lowercase folders, ErrorBoundary
+  global, `http` with timeout.
+- **Backend correctness (#63):** merged. Typed YT Music exceptions.
+- **Backend correctness (#64–#66):** open. Failure events, atomic
+  report writes, full pytest suite.
+- **Integration / FastAPI (#67–#71):** open. Bootstrap, auth, read-only
+  routes, migrate POST + WS, OpenAPI-generated TS types + Vite proxy.
+  **This is the unlock for the frontend's mock-only state.**
+- **Desktop / Tauri (#72–#74):** open. PyInstaller sidecar, Tauri scaffold,
+  OAuth + auto-updater.
+
+The critical path to a real (non-mock) end-to-end app is **#67 → #68 →
+#69 → #70 → #71**. Until #71 lands, the frontend talks to MSW: Connect
+buttons, Migrate jobs, and Reports come from fixtures, not the backend.
