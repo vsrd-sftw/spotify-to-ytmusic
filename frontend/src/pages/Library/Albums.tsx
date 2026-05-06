@@ -1,8 +1,7 @@
 import { Button, EmptyState, List, ListItem, ListItemTrailing, Skeleton } from '@/components/ui';
-import { usePlaylists } from '@/features/library/usePlaylists';
-import type { SelectionState } from '@/features/library/useSelection';
+import { useAlbums } from '@/features/library/useAlbums';
 
-function PlaylistSkeletons() {
+function AlbumSkeletons() {
   return (
     <div className="flex flex-col gap-3 p-4">
       {Array.from({ length: 5 }).map((_, i) => (
@@ -12,27 +11,22 @@ function PlaylistSkeletons() {
   );
 }
 
-export interface PlaylistsProps {
+export interface AlbumsProps {
   selectedIds?: Set<string>;
   onToggle?: (id: string) => void;
   onToggleAll?: () => void;
-  selectionState?: SelectionState;
+  selectionState?: 'none' | 'some' | 'all';
 }
 
-export function Playlists({
-  selectedIds = new Set(),
-  onToggle,
-  onToggleAll,
-  selectionState = 'none',
-}: PlaylistsProps) {
-  const { data, isLoading, isError, refetch } = usePlaylists();
+export function Albums({ selectedIds = new Set(), onToggle, onToggleAll, selectionState = 'none' }: AlbumsProps) {
+  const { data, isLoading, isError, refetch } = useAlbums();
 
-  if (isLoading) return <PlaylistSkeletons />;
+  if (isLoading) return <AlbumSkeletons />;
 
   if (isError) {
     return (
       <div className="flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm text-red-600">No se pudieron cargar las playlists.</p>
+        <p className="text-sm text-red-600">No se pudieron cargar los álbumes.</p>
         <Button onClick={() => refetch()}>Reintentar</Button>
       </div>
     );
@@ -41,8 +35,8 @@ export function Playlists({
   if (!data || data.length === 0) {
     return (
       <EmptyState
-        title="No tienes playlists"
-        description="Conecta Spotify para ver tus playlists aquí."
+        title="No tienes álbumes guardados"
+        description="Conecta Spotify para ver tus álbumes aquí."
       />
     );
   }
@@ -53,7 +47,7 @@ export function Playlists({
         <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-gray-50">
           <input
             type="checkbox"
-            aria-label="Seleccionar todas las playlists"
+            aria-label="Seleccionar todos los álbumes"
             checked={selectionState === 'all'}
             ref={(el) => {
               if (el) el.indeterminate = selectionState === 'some';
@@ -61,25 +55,25 @@ export function Playlists({
             onChange={onToggleAll}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-xs text-gray-500">Seleccionar todas</span>
+          <span className="text-xs text-gray-500">Seleccionar todos</span>
         </div>
       )}
       <List selectedIds={[...selectedIds]} onSelect={onToggle}>
-        {data.map((playlist) => (
-          <ListItem key={playlist.id} id={playlist.id}>
+        {data.map((album) => (
+          <ListItem key={album.spotifyId} id={album.spotifyId}>
             {onToggle && (
               <input
                 type="checkbox"
-                aria-label={`Seleccionar ${playlist.name}`}
-                checked={selectedIds.has(playlist.id)}
-                onChange={() => onToggle(playlist.id)}
+                aria-label={`Seleccionar ${album.name}`}
+                checked={selectedIds.has(album.spotifyId)}
+                onChange={() => onToggle(album.spotifyId)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600"
                 onClick={(e) => e.stopPropagation()}
               />
             )}
-            <span className="flex-1 text-sm font-medium text-gray-900">{playlist.name}</span>
+            <span className="flex-1 text-sm font-medium text-gray-900">{album.name}</span>
             <ListItemTrailing>
-              <span className="text-xs text-gray-500">{playlist.trackCount} canciones</span>
+              <span className="text-xs text-gray-500">{album.artist}</span>
             </ListItemTrailing>
           </ListItem>
         ))}
