@@ -32,15 +32,19 @@ Copy `.env.example` to `.env` and fill in your app credentials:
 ```env
 SPOTIFY_CLIENT_ID=your_client_id
 SPOTIFY_CLIENT_SECRET=your_client_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/api/auth/spotify/callback
 ```
 
 To get the credentials:
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
    and create an app.
-2. Add `http://127.0.0.1:8888/callback` to the **Redirect URIs**.
+2. Add `http://127.0.0.1:8000/api/auth/spotify/callback` to the **Redirect URIs**.
 3. Copy the **Client ID** and **Client Secret** into `.env`.
+
+> If you also use the CLI (`python main.py`), set `SPOTIFY_REDIRECT_URI` to
+> `http://127.0.0.1:8888/callback` in your `.env` and add that URI to your
+> Spotify dashboard as well. The API server uses port 8000 by default.
 
 ### 2. YouTube Music authentication
 
@@ -63,6 +67,33 @@ A `data/browser.json` file is created with your session.
 
 > Browser sessions expire periodically. If you start seeing authentication
 > errors, run `setup_ytmusic.py` again.
+
+## API server
+
+The FastAPI server exposes HTTP and WebSocket endpoints for the frontend.
+
+```bash
+# Install API dependencies
+pip install -e ".[api]"
+
+# Start the server (default port 8000)
+python -m spotify_to_ytmusic.api.server
+
+# Or specify a custom port
+python -m spotify_to_ytmusic.api.server 9000
+```
+
+The server prints the effective URL on startup. Endpoints:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Auth status for Spotify and YT Music |
+| `POST` | `/api/auth/spotify` | Returns Spotify OAuth authorize URL |
+| `GET` | `/api/auth/spotify/callback` | OAuth callback, redirects to frontend |
+| `POST` | `/api/auth/ytmusic` | Saves YT Music browser headers |
+
+All responses are serialized in `camelCase`. CORS is restricted to
+`localhost:5173` (Vite dev) and Tauri origins.
 
 ## Usage
 
