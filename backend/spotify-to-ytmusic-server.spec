@@ -74,10 +74,8 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="spotify-to-ytmusic-server",
     debug=False,
     bootloader_ignore_signals=False,
