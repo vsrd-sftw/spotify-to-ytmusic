@@ -17,14 +17,14 @@ from spotify_to_ytmusic.core.models import Album, Playlist, PlaylistSummary, Tra
 
 
 class SpotifyClient:
-    def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
+    def __init__(self, client_id: str, client_secret: str, redirect_uri: str, open_browser: bool = True):
         self.sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
             client_id=client_id,
             client_secret=client_secret,
             redirect_uri=redirect_uri,
             scope=SPOTIFY_SCOPES,
             cache_path=SPOTIFY_TOKEN_CACHE_FILE,
-            open_browser=True,
+            open_browser=open_browser,
         ))
 
     def get_current_user_id(self) -> str:

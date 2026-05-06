@@ -57,6 +57,8 @@ function formatEvent(event: MigrationEvent): string {
       return `Error chunk ${event.chunkIndex + 1}/${event.totalChunks} en "${event.name}": ${event.reason}`;
     case 'AlbumSaveFailed':
       return `Error guardando "${event.label}": ${event.reason}`;
+    case 'MigrationFinished':
+      return `Migración completada (reporte ${event.reportId})`;
   }
 }
 

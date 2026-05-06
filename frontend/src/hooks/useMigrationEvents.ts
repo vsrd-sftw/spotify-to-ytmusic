@@ -186,6 +186,7 @@ export function migrationReducer(
     case 'PlaylistCreationFailed':
     case 'PlaylistChunkFailed':
     case 'AlbumSaveFailed':
+    case 'MigrationFinished':
       return { ...state, events };
   }
 }
