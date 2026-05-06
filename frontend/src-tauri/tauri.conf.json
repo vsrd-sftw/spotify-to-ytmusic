@@ -10,7 +10,6 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
-    "title": "Spotify to YT Music",
     "windows": [
       {
         "title": "Spotify to YT Music",
@@ -57,16 +56,6 @@
           "args": true
         }
       ]
-    }
-  },
-  "updater": {
-    "active": true,
-    "endpoints": [
-      "https://github.com/vsrd-sftw/spotify-to-ytmusic/releases/latest/download/latest.json"
-    ],
-    "pubkey": "PLACEHOLDER_UPDATE_RSA_PUBLIC_KEY",
-    "windows": {
-      "installMode": "passive"
     }
   }
 }

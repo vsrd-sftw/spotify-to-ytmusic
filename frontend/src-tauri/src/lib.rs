@@ -1,12 +1,12 @@
-use std::process::Command as StdCommand;
 use std::sync::Mutex;
 
 use tauri::Manager;
+use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
 struct SidecarState {
     port: u16,
-    child_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    _child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
 }
 
 #[tauri::command]
@@ -22,12 +22,12 @@ pub fn run() {
             let port = if cfg!(debug_assertions) {
                 8000u16
             } else {
-                spawn_sidecar(app)?
+                tauri::async_runtime::block_on(spawn_sidecar(app.handle()))?
             };
 
             app.manage(SidecarState {
                 port,
-                child_handle: Mutex::new(None),
+                _child: Mutex::new(None),
             });
 
             Ok(())
@@ -37,34 +37,36 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn spawn_sidecar(app: &tauri::App) -> Result<u16, Box<dyn std::error::Error>> {
-    use std::io::BufRead;
-
-    let sidecar_command = app
+async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error::Error>> {
+    let (mut rx, child) = app
         .shell()
         .sidecar("spotify-to-ytmusic-server")
         .map_err(|e| format!("sidecar binary not found: {e}"))?
-        .args(["0"]);
-
-    let (mut rx, child) = sidecar_command
+        .args(["0"])
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
 
     let port: u16;
-    if let Some(line) = std::io::BufReader::new(rx.stdout.as_mut().unwrap()).lines().next() {
-        let line = line?;
-        port = line
-            .trim_start_matches("SERVER_LISTENING port=")
-            .parse()
-            .map_err(|_| format!("invalid SERVER_LISTENING line: {line}"))?;
-    } else {
-        return Err("sidecar exited without printing SERVER_LISTENING".into());
+    loop {
+        match rx.recv().await {
+            Some(CommandEvent::Stdout(line)) => {
+                let text = String::from_utf8_lossy(&line);
+                if let Some(p) = text.trim().strip_prefix("SERVER_LISTENING port=") {
+                    port = p
+                        .parse()
+                        .map_err(|_| format!("invalid SERVER_LISTENING line: {text}"))?;
+                    break;
+                }
+            }
+            Some(CommandEvent::Terminated(_)) | None => {
+                return Err("sidecar exited without printing SERVER_LISTENING".into());
+            }
+            _ => {}
+        }
     }
 
-    let handle = app.handle().clone();
-    tokio::task::spawn(async move {
-        let _ = child.into_output().await;
-        let _ = handle;
+    tauri::async_runtime::spawn(async move {
+        let _ = child;
     });
 
     Ok(port)
