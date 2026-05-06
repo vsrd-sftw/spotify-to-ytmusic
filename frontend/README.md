@@ -13,10 +13,10 @@ Web UI for `spotify-to-ytmusic`. Talks to the FastAPI backend in `../backend` ov
 
 ```bash
 cd frontend
-npm create vite@latest . -- --template react-ts
-npm install
-npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
+pnpm create vite@latest . -- --template react-ts
+pnpm install
+pnpm add -D tailwindcss postcss autoprefixer
+pnpm dlx tailwindcss init -p
 ```
 
 ## Backend contract (planned)

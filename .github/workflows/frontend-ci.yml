@@ -1,0 +1,47 @@
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - 'CLAUDE.md'
+      - 'CONTRIBUTING.md'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'CLAUDE.md'
+      - 'CONTRIBUTING.md'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm-action/setup@v1
+        with:
+          version: 10
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - run: pnpm run lint
+        working-directory: frontend
+
+      - run: pnpm exec tsc --noEmit
+        working-directory: frontend
+
+      - run: pnpm test
+        working-directory: frontend
+
+      - run: pnpm run build
+        working-directory: frontend
