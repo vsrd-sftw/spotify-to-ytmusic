@@ -1,0 +1,1 @@
+Lee la issue $ARGUMENTS del repositorio vsrd-sftw/spotify-to-ytmusic con `gh issue view $ARGUMENTS --repo vsrd-sftw/spotify-to-ytmusic` y resuélvela completamente siguiendo el Definition of Done del CLAUDE.md: criterios de aceptación, código limpio, tests que pasen, y respeto a la arquitectura existente.
