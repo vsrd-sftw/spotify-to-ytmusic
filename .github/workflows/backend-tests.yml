@@ -23,6 +23,6 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install dependencies
-        run: pip install -e '.[dev]'
+        run: pip install -e '.[dev,api]'
       - name: Run pytest
         run: pytest -v
