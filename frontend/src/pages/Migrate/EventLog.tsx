@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMigrationEvents } from '@/hooks/useMigrationEvents';
-import { useAppSection } from '@/hooks/useAppSection';
-import { useNotFoundItems } from '@/features/migrate/useNotFoundItems';
-import { useMigrationSummary } from '@/features/migrate/useMigrationSummary';
-import { NotFound } from '@/components/Migrate/NotFound';
-import { CompletionSummary } from '@/components/Migrate/CompletionSummary';
-import { ConnectionBanner } from '@/components/Migrate/ConnectionBanner';
+import { NotFound } from '@/components/migrate/NotFound';
+import { CompletionSummary } from '@/components/migrate/CompletionSummary';
+import { ConnectionBanner } from '@/components/migrate/ConnectionBanner';
 import type { WsState } from '@/hooks/useMigrationEvents';
 import type { MigrationEvent } from '@/types/api';
 
@@ -57,16 +55,28 @@ function formatEvent(event: MigrationEvent): string {
 }
 
 export function EventLog({ jobId }: EventLogProps) {
-  const { events, state, retry, retryCount } = useMigrationEvents(jobId);
+  const { events, state, retry, retryCount, summary, notFoundLabels } =
+    useMigrationEvents(jobId);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { setSection } = useAppSection();
-  const { labels } = useNotFoundItems(events);
-  const summary = useMigrationSummary(events);
+  const navigate = useNavigate();
+  const scrollPendingRef = useRef(false);
 
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
+    // Coalesce multiple events arriving within the same frame into a single
+    // scroll-to-bottom (one reflow per frame instead of one per event).
+    if (scrollPendingRef.current) return;
+    scrollPendingRef.current = true;
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (cb: FrameRequestCallback) => setTimeout(cb, 16) as unknown as number;
+    raf(() => {
+      const el = containerRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+      scrollPendingRef.current = false;
+    });
   }, [events]);
 
   const isClosedCleanly = state === 'closed' && events.length > 0;
@@ -104,10 +114,10 @@ export function EventLog({ jobId }: EventLogProps) {
           albumsFound={summary.albumsFound}
           albumsTotal={summary.albumsTotal}
           notFoundCount={summary.notFoundCount}
-          onViewReport={() => setSection('reports')}
+          onViewReport={() => navigate('/reports')}
         />
       ) : (
-        <NotFound labels={labels} />
+        <NotFound labels={notFoundLabels} />
       )}
     </div>
   );

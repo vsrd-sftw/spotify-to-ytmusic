@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useSelectionContext } from '@/contexts/useSelectionContext';
 
 export type SelectionState = 'none' | 'some' | 'all';
+export type SelectionKind = 'playlists' | 'albums';
 
 export interface UseSelectionResult {
   selectedIds: Set<string>;
@@ -9,34 +10,28 @@ export interface UseSelectionResult {
   selectionState: SelectionState;
 }
 
-export function useSelection<T>(items: T[], getId: (item: T) => string): UseSelectionResult {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+export function useSelection<T>(
+  items: T[],
+  getId: (item: T) => string,
+  kind: SelectionKind,
+): UseSelectionResult {
+  const ctx = useSelectionContext();
 
-  const toggle = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
+  const selectedIds = kind === 'playlists' ? ctx.selectedPlaylistIds : ctx.selectedAlbumIds;
+  const toggle = kind === 'playlists' ? ctx.togglePlaylist : ctx.toggleAlbum;
   const toggleAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === items.length && items.length > 0) {
-        return new Set();
-      }
-      return new Set(items.map(getId));
-    });
+    const ids = items.map(getId);
+    if (kind === 'playlists') {
+      ctx.toggleAllPlaylists(ids);
+    } else {
+      ctx.toggleAllAlbums(ids);
+    }
   };
 
   const selectionState: SelectionState =
     selectedIds.size === 0
       ? 'none'
-      : selectedIds.size === items.length
+      : selectedIds.size === items.length && items.length > 0
         ? 'all'
         : 'some';
 

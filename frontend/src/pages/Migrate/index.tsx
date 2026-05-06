@@ -1,45 +1,69 @@
 import { useState } from 'react';
-import { useAppSection } from '@/hooks/useAppSection';
+import { useNavigate } from 'react-router-dom';
 import { useSelection } from '@/features/library';
 import { useMigrationSelection, useStartMigration } from '@/features/migrate';
 import { usePlaylists } from '@/features/library/usePlaylists';
 import { useAlbums } from '@/features/library/useAlbums';
+import { useSelectionContext } from '@/contexts/useSelectionContext';
+import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
 import { EventLog } from './EventLog';
 
 export function MigratePage() {
-  const { setSection } = useAppSection();
+  const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
+  const { clearAll } = useSelectionContext();
 
   const { data: playlists = [] } = usePlaylists();
   const { data: albums = [] } = useAlbums();
 
-  const playlistSelection = useSelection(playlists, (p) => p.id);
-  const albumSelection = useSelection(albums, (a) => a.spotifyId);
+  const playlistSelection = useSelection(playlists, (p) => p.id, 'playlists');
+  const albumSelection = useSelection(albums, (a) => a.spotifyId, 'albums');
 
   const migration = useMigrationSelection(playlistSelection.selectedIds, albumSelection.selectedIds);
 
   const startMigration = useStartMigration({
-    onSuccess: (newJobId) => setJobId(newJobId),
+    onSuccess: (newJobId) => {
+      setJobId(newJobId);
+      clearAll();
+    },
   });
+
+  // Drives focus to the active heading on mount and whenever the page
+  // switches between empty / confirm / progress states.
+  const branch = jobId ? 'progress' : migration.isEmpty ? 'empty' : 'confirm';
+  const headingRef = useAutoFocusHeading<HTMLHeadingElement>([branch]);
 
   if (migration.isEmpty && !jobId) {
     return (
-      <div className="p-4 sm:p-6 flex flex-col items-center justify-center h-64 gap-4">
+      <section className="p-4 sm:p-6 flex flex-col items-center justify-center h-64 gap-4">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-xl font-semibold text-gray-900 outline-none"
+        >
+          Migrar
+        </h2>
         <p className="text-gray-600">No hay elementos seleccionados.</p>
         <button
-          onClick={() => setSection('library')}
+          onClick={() => navigate('/library')}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Ir a Biblioteca
         </button>
-      </div>
+      </section>
     );
   }
 
   if (jobId) {
     return (
       <section className="p-4 sm:p-6">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">Migración en Progreso</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="mb-4 text-xl font-semibold text-gray-900 outline-none"
+        >
+          Migración en Progreso
+        </h2>
         <EventLog jobId={jobId} />
       </section>
     );
@@ -47,7 +71,13 @@ export function MigratePage() {
 
   return (
     <section className="p-4 sm:p-6 flex flex-col gap-4">
-      <h2 className="text-xl font-semibold text-gray-900">Confirmar Migración</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl font-semibold text-gray-900 outline-none"
+      >
+        Confirmar Migración
+      </h2>
       <div className="text-gray-700">
         <p>¿Confirmas que quieres migrar?</p>
         <ul className="mt-2 list-disc list-inside">
@@ -58,7 +88,7 @@ export function MigratePage() {
       </div>
       <div className="flex gap-2">
         <button
-          onClick={() => setSection('library')}
+          onClick={() => navigate('/library')}
           className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
         >
           Cancelar

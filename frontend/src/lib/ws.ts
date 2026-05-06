@@ -90,8 +90,14 @@ export class WsConnection {
       this.onMessage?.(ev.data);
     };
 
-    this.socket.onclose = () => {
+    this.socket.onclose = (ev: CloseEvent) => {
       if (this.manualClose) {
+        this.onStateChange?.('closed');
+        return;
+      }
+      // 1000 = normal closure, 1005 = no status received but clean.
+      // Treat both as the server intentionally ending the stream — no reconnect.
+      if (ev.wasClean || ev.code === 1000 || ev.code === 1005) {
         this.onStateChange?.('closed');
         return;
       }
