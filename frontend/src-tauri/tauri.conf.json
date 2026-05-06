@@ -49,13 +49,7 @@
   },
   "plugins": {
     "shell": {
-      "scope": [
-        {
-          "name": "binaries/spotify-to-ytmusic-server",
-          "sidecar": true,
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
