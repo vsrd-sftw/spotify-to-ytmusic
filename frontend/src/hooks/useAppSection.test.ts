@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { AppSectionProvider, useAppSection } from '@/contexts/AppSectionContext'
+import { AppSectionProvider } from '@/contexts/AppSectionContext'
+import { useAppSection } from './useAppSection'
 
 describe('useAppSection', () => {
   it('provides initial section as connect', () => {

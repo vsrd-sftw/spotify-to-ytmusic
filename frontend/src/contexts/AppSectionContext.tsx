@@ -1,13 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { AppSectionContext } from './AppSectionContextValue'
 
 export type AppSection = 'connect' | 'library' | 'migrate' | 'reports'
-
-interface AppSectionContextValue {
-  section: AppSection
-  setSection: (section: AppSection) => void
-}
-
-const AppSectionContext = createContext<AppSectionContextValue | null>(null)
 
 interface AppSectionProviderProps {
   children: ReactNode
@@ -21,12 +15,4 @@ export function AppSectionProvider({ children }: AppSectionProviderProps) {
       {children}
     </AppSectionContext.Provider>
   )
-}
-
-export function useAppSection() {
-  const context = useContext(AppSectionContext)
-  if (!context) {
-    throw new Error('useAppSection must be used within AppSectionProvider')
-  }
-  return context
 }
