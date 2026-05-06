@@ -14,6 +14,10 @@ vi.mock('@/hooks/useMigrationEvents', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useAppSection', () => ({
+  useAppSection: () => ({ setSection: vi.fn() }),
+}));
+
 describe('EventLog', () => {
   it('renders connection state badge', () => {
     render(<EventLog jobId="job-123" />);

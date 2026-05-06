@@ -15,6 +15,11 @@ vi.mock('@/hooks/useMigrationEvents', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useAppSection', () => ({
+  useAppSection: () => ({ setSection: vi.fn() }),
+  AppSectionProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 describe('EventLog', () => {
   it('renders without crashing', () => {
     const wrapper = makeQueryWrapper();

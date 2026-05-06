@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useMigrationEvents } from '@/hooks/useMigrationEvents';
+import { useAppSection } from '@/hooks/useAppSection';
+import { useNotFoundItems } from '@/features/migrate/useNotFoundItems';
+import { useMigrationSummary } from '@/features/migrate/useMigrationSummary';
+import { NotFound } from '@/components/Migrate/NotFound';
+import { CompletionSummary } from '@/components/Migrate/CompletionSummary';
 import type { WsState } from '@/hooks/useMigrationEvents';
 import type { MigrationEvent } from '@/types/api';
 
@@ -49,12 +54,17 @@ function formatEvent(event: MigrationEvent): string {
 export function EventLog({ jobId }: EventLogProps) {
   const { events, state } = useMigrationEvents(jobId);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { setSection } = useAppSection();
+  const { labels } = useNotFoundItems(events);
+  const summary = useMigrationSummary(events);
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [events]);
+
+  const isClosedCleanly = state === 'closed' && events.length > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -78,6 +88,18 @@ export function EventLog({ jobId }: EventLogProps) {
           ))
         )}
       </div>
+      {isClosedCleanly ? (
+        <CompletionSummary
+          tracksFound={summary.tracksFound}
+          tracksTotal={summary.tracksTotal}
+          albumsFound={summary.albumsFound}
+          albumsTotal={summary.albumsTotal}
+          notFoundCount={summary.notFoundCount}
+          onViewReport={() => setSection('reports')}
+        />
+      ) : (
+        <NotFound labels={labels} />
+      )}
     </div>
   );
 }

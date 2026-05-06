@@ -6,3 +6,6 @@ export { usePlaylistProgress } from './usePlaylistProgress';
 export type { PlaylistProgressItem, PlaylistProgressStatus } from './usePlaylistProgress';
 export { useAlbumProgress } from './useAlbumProgress';
 export type { AlbumProgressItem } from './useAlbumProgress';
+export { useNotFoundItems } from './useNotFoundItems';
+export { useMigrationSummary } from './useMigrationSummary';
+export type { MigrationSummary } from './useMigrationSummary';
