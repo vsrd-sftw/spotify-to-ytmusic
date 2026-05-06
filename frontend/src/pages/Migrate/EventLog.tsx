@@ -83,6 +83,8 @@ export function EventLog({ jobId }: EventLogProps) {
       <ConnectionBanner state={state} retryCount={retryCount} onRetry={retry} />
       <div
         ref={containerRef}
+        role="log"
+        aria-live="polite"
         className="h-64 overflow-y-auto bg-gray-50 border rounded-md p-3 font-mono text-sm"
       >
         {events.length === 0 && !isReconnecting ? (
