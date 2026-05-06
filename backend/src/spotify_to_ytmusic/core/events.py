@@ -53,6 +53,11 @@ class AlbumSaveFailed:
     reason: str
 
 
+@dataclass
+class MigrationFinished:
+    report_id: str
+
+
 MigrationEvent = Union[
     PlaylistsDiscovered,
     PlaylistStarted,
@@ -62,6 +67,7 @@ MigrationEvent = Union[
     PlaylistCreationFailed,
     PlaylistChunkFailed,
     AlbumSaveFailed,
+    MigrationFinished,
 ]
 
 EventCallback = Callable[[MigrationEvent], None]

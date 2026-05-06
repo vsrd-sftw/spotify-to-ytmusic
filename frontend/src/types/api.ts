@@ -104,6 +104,11 @@ export interface AlbumSaveFailedEvent {
   reason: string;
 }
 
+export interface MigrationFinishedEvent {
+  type: 'MigrationFinished';
+  reportId: string;
+}
+
 export interface HealthResponse {
   ok: boolean;
   spotify?: boolean;
@@ -118,4 +123,5 @@ export type MigrationEvent =
   | AlbumProcessedEvent
   | PlaylistCreationFailedEvent
   | PlaylistChunkFailedEvent
-  | AlbumSaveFailedEvent;
+  | AlbumSaveFailedEvent
+  | MigrationFinishedEvent;
