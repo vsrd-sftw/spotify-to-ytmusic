@@ -38,7 +38,7 @@ function ReportItem({
                 )}
               </div>
             </div>
-            <span className="text-gray-400">→</span>
+            <span className="text-gray-500">→</span>
           </div>
         </CardBody>
       </Card>
@@ -67,7 +67,12 @@ export function ReportsList({ onSelectReport }: ReportsListProps) {
   const { data, isLoading, error } = useReports();
 
   if (isLoading) {
-    return <SkeletonList />;
+    return (
+      <div aria-busy="true" role="status">
+        <span className="sr-only">Cargando reportes...</span>
+        <SkeletonList />
+      </div>
+    );
   }
 
   if (error) {

@@ -46,7 +46,7 @@ export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
 
   return (
     <div>
-      <div role="tablist" onKeyDown={handleKeyDown} className="flex border-b">
+      <div role="tablist" onKeyDown={handleKeyDown} className="flex border-b overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;
           return (
