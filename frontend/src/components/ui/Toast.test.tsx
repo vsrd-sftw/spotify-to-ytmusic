@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { ToastProvider, useToast, ToastContainer } from './Toast'
+import { ToastProvider } from '../../lib/ToastContext'
+import { useToast } from '../../lib/useToast'
+import { ToastContainer } from './Toast'
 import type { ReactNode } from 'react'
 
 function TestComponent({ onSuccess, onError, onInfo }: { onSuccess?: () => void; onError?: () => void; onInfo?: () => void }) {
