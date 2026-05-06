@@ -84,6 +84,26 @@ export interface AlbumProcessedEvent {
   status: AlbumStatus;
 }
 
+export interface PlaylistCreationFailedEvent {
+  type: 'PlaylistCreationFailed';
+  name: string;
+  reason: string;
+}
+
+export interface PlaylistChunkFailedEvent {
+  type: 'PlaylistChunkFailed';
+  name: string;
+  chunkIndex: number;
+  totalChunks: number;
+  reason: string;
+}
+
+export interface AlbumSaveFailedEvent {
+  type: 'AlbumSaveFailed';
+  label: string;
+  reason: string;
+}
+
 export interface HealthResponse {
   ok: boolean;
   spotify?: boolean;
@@ -95,4 +115,7 @@ export type MigrationEvent =
   | PlaylistStartedEvent
   | PlaylistFinishedEvent
   | AlbumsDiscoveredEvent
-  | AlbumProcessedEvent;
+  | AlbumProcessedEvent
+  | PlaylistCreationFailedEvent
+  | PlaylistChunkFailedEvent
+  | AlbumSaveFailedEvent;

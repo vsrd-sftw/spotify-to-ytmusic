@@ -12,6 +12,7 @@ from spotify_to_ytmusic.core.models import (
 )
 from spotify_to_ytmusic.core.track_cache import TrackCache
 from spotify_to_ytmusic.core.ytmusic_client import (
+    YTMusicChunkError,
     YTMusicFatalError,
     YTMusicTransientError,
 )
@@ -62,6 +63,7 @@ def test_migrate_playlist_records_fatal_in_report_and_continues(tmp_path):
         YTMusicFatalError("creation forbidden"),
         "PL_yt_2",
     ]
+    ytmusic.add_tracks_to_playlist.return_value = None
 
     migrator.migrate_playlists()
 
@@ -170,3 +172,77 @@ def test_migrate_album_records_fatal_from_search_in_report_and_continues(tmp_pat
     ok = migrator.report.albums[1]
     assert ok.error is None
     assert ok.status == "saved"
+
+
+# --- Failure events ------------------------------------------------------
+
+
+def test_migrate_playlist_emits_creation_failed_event(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_current_user_id.return_value = "u"
+    spotify.list_playlist_summaries.return_value = [_summary("p1", "Broken")]
+    spotify.load_playlist_by_id.return_value = Playlist(
+        id="p1", name="Broken", description="d", tracks=[_track("S", spot_id="t1")]
+    )
+    ytmusic.search_song.return_value = "VID_X"
+    ytmusic.create_playlist.side_effect = YTMusicFatalError("quota exceeded")
+
+    migrator.migrate_playlists()
+
+    creation_failed = [e for e in events if type(e).__name__ == "PlaylistCreationFailed"]
+    assert len(creation_failed) == 1
+    assert creation_failed[0].name == "Broken"
+    assert "quota exceeded" in creation_failed[0].reason
+
+
+def test_migrate_playlist_emits_chunk_failed_event(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_current_user_id.return_value = "u"
+    spotify.list_playlist_summaries.return_value = [_summary("p1", "ChunkFail")]
+    spotify.load_playlist_by_id.return_value = Playlist(
+        id="p1", name="ChunkFail", description="d", tracks=[_track("S", spot_id="t1")]
+    )
+    ytmusic.search_song.return_value = "VID_X"
+    ytmusic.create_playlist.return_value = "PL_created"
+    ytmusic.add_tracks_to_playlist.side_effect = YTMusicChunkError(
+        chunk_index=0, total_chunks=1, reason="throttled"
+    )
+
+    migrator.migrate_playlists()
+
+    chunk_failed = [e for e in events if type(e).__name__ == "PlaylistChunkFailed"]
+    assert len(chunk_failed) == 1
+    assert chunk_failed[0].name == "ChunkFail"
+    assert chunk_failed[0].chunk_index == 0
+    assert chunk_failed[0].total_chunks == 1
+
+
+def test_migrate_album_emits_save_failed_event(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_saved_albums.return_value = [
+        Album(name="In Rainbows", artist="Radiohead", spotify_id="a1"),
+    ]
+    ytmusic.search_album.return_value = {"browseId": "BR"}
+    ytmusic.save_album.side_effect = YTMusicFatalError("save forbidden")
+
+    migrator.migrate_albums()
+
+    save_failed = [e for e in events if type(e).__name__ == "AlbumSaveFailed"]
+    assert len(save_failed) == 1
+    assert save_failed[0].label == "Radiohead - In Rainbows"
+    assert "save forbidden" in save_failed[0].reason
