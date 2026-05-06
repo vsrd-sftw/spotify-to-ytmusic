@@ -5,6 +5,7 @@ import { useAppSection } from '@/hooks/useAppSection'
 import { LibraryPage } from '@/pages/Library'
 import { SpotifyConnect } from '@/pages/Connect/Spotify'
 import { YTMusicConnect } from '@/pages/Connect/YTMusic'
+import { MigratePage } from '@/pages/Migrate'
 
 function AppContent() {
   const { section } = useAppSection()
@@ -18,11 +19,7 @@ function AppContent() {
         </div>
       )}
       {section === 'library' && <LibraryPage />}
-      {section === 'migrate' && (
-        <div className="flex items-center justify-center h-64 text-gray-400">
-          Migración (próximamente)
-        </div>
-      )}
+      {section === 'migrate' && <MigratePage />}
       {section === 'reports' && (
         <div className="flex items-center justify-center h-64 text-gray-400">
           Reportes (próximamente)
