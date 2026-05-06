@@ -12,7 +12,9 @@ const migrationEvents = ws.link('*/api/migrate/:jobId/events');
 export const handlers = [
   http.get('*/api/health', () => HttpResponse.json({ ok: true })),
 
-  http.post('*/api/auth/spotify', () => HttpResponse.json({ ok: true })),
+  http.post('*/api/auth/spotify', () =>
+    HttpResponse.json({ url: 'http://127.0.0.1:8888/auth/spotify' }),
+  ),
 
   http.post('*/api/auth/ytmusic', () => HttpResponse.json({ ok: true })),
 
@@ -42,3 +44,8 @@ export const handlers = [
     }, 50);
   }),
 ];
+
+export const spotifyAuthErrorHandler = http.post(
+  '*/api/auth/spotify',
+  () => HttpResponse.json({ message: 'Error de configuración' }, { status: 500 }),
+);
