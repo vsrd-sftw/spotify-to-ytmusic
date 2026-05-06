@@ -17,9 +17,9 @@ router = APIRouter(prefix="/api")
 def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None):
     """Create a SpotifyOAuth instance without opening a browser.
 
-    `redirect_uri` overrides the default from ``SPOTIFY_REDIRECT_URI``.
-    This is used by the desktop flow so the sidecar can assemble the
-    callback URL from its dynamically assigned port.
+    ``redirect_uri`` overrides the default API callback.  The env var
+    ``SPOTIFY_REDIRECT_URI`` is deliberately *not* consulted here — it
+    belongs to the CLI flow (:8888), not the API server (:8000).
     """
     import os
     from spotipy.oauth2 import SpotifyOAuth
@@ -27,10 +27,7 @@ def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None
 
     client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "")
-    effective_redirect = redirect_uri or os.getenv(
-        "SPOTIFY_REDIRECT_URI",
-        "http://127.0.0.1:8000/api/auth/spotify/callback",
-    )
+    effective_redirect = redirect_uri or "http://127.0.0.1:8000/api/auth/spotify/callback"
     return SpotifyOAuth(
         client_id=client_id,
         client_secret=client_secret,
