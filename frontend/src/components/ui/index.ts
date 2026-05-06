@@ -30,3 +30,6 @@ export type { ToastProviderProps } from './Toast'
 
 export { useToast } from '../../lib/useToast'
 export type { Toast, ToastType } from '../../lib/ToastContextValue'
+
+export { EmptyState } from './EmptyState'
+export type { EmptyStateProps } from './EmptyState'
