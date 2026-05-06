@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { resolveWsUrl, WsConnection, WsConnectionState } from '@/lib/ws';
+import { resolveWsUrl, WsConnection } from '@/lib/ws';
+import type { WsConnectionState } from '@/lib/ws';
 import type { MigrationEvent } from '@/types/api';
 
 export type WsState = WsConnectionState;
