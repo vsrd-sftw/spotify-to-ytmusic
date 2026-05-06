@@ -17,12 +17,22 @@ const stateLabel: Record<ConnectionState, string> = {
   disconnected: 'desconectado',
 };
 
+// Glyphs convey the state in addition to color (WCAG 1.4.1).
+const stateIcon: Record<ConnectionState, string> = {
+  unknown: '○',
+  connected: '●',
+  disconnected: '✕',
+};
+
 function ConnectionBadge({ label, state }: BadgeProps) {
   return (
     <span
-      className={['inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', stateStyles[state]].join(' ')}
+      className={['inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium', stateStyles[state]].join(' ')}
       aria-label={`Estado de conexión: ${label} ${stateLabel[state]}`}
     >
+      <span aria-hidden="true" data-testid={`connection-icon-${state}`}>
+        {stateIcon[state]}
+      </span>
       {label}
     </span>
   );

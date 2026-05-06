@@ -5,6 +5,7 @@ import { useMigrationSelection, useStartMigration } from '@/features/migrate';
 import { usePlaylists } from '@/features/library/usePlaylists';
 import { useAlbums } from '@/features/library/useAlbums';
 import { useSelectionContext } from '@/contexts/useSelectionContext';
+import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
 import { EventLog } from './EventLog';
 
 export function MigratePage() {
@@ -27,9 +28,21 @@ export function MigratePage() {
     },
   });
 
+  // Drives focus to the active heading on mount and whenever the page
+  // switches between empty / confirm / progress states.
+  const branch = jobId ? 'progress' : migration.isEmpty ? 'empty' : 'confirm';
+  const headingRef = useAutoFocusHeading<HTMLHeadingElement>([branch]);
+
   if (migration.isEmpty && !jobId) {
     return (
-      <div className="p-4 sm:p-6 flex flex-col items-center justify-center h-64 gap-4">
+      <section className="p-4 sm:p-6 flex flex-col items-center justify-center h-64 gap-4">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-xl font-semibold text-gray-900 outline-none"
+        >
+          Migrar
+        </h2>
         <p className="text-gray-600">No hay elementos seleccionados.</p>
         <button
           onClick={() => navigate('/library')}
@@ -37,14 +50,20 @@ export function MigratePage() {
         >
           Ir a Biblioteca
         </button>
-      </div>
+      </section>
     );
   }
 
   if (jobId) {
     return (
       <section className="p-4 sm:p-6">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">Migración en Progreso</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="mb-4 text-xl font-semibold text-gray-900 outline-none"
+        >
+          Migración en Progreso
+        </h2>
         <EventLog jobId={jobId} />
       </section>
     );
@@ -52,7 +71,13 @@ export function MigratePage() {
 
   return (
     <section className="p-4 sm:p-6 flex flex-col gap-4">
-      <h2 className="text-xl font-semibold text-gray-900">Confirmar Migración</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl font-semibold text-gray-900 outline-none"
+      >
+        Confirmar Migración
+      </h2>
       <div className="text-gray-700">
         <p>¿Confirmas que quieres migrar?</p>
         <ul className="mt-2 list-disc list-inside">

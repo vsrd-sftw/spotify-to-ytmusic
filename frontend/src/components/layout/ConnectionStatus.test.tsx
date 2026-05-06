@@ -26,4 +26,30 @@ describe('ConnectionStatus', () => {
     expect(screen.getByLabelText(/spotify desconocido/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/yt music desconocido/i)).toBeInTheDocument();
   });
+
+  it('renders a connected icon (●) when connected', () => {
+    render(<ConnectionStatus spotify="connected" ytmusic="unknown" />);
+    const icons = screen.getAllByTestId('connection-icon-connected');
+    expect(icons).toHaveLength(1);
+    expect(icons[0]).toHaveTextContent('●');
+    expect(icons[0]).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('renders a disconnected icon (✕) when disconnected', () => {
+    render(<ConnectionStatus spotify="disconnected" ytmusic="connected" />);
+    const icons = screen.getAllByTestId('connection-icon-disconnected');
+    expect(icons).toHaveLength(1);
+    expect(icons[0]).toHaveTextContent('✕');
+    expect(icons[0]).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('renders an unknown icon (○) when unknown', () => {
+    render(<ConnectionStatus spotify="unknown" ytmusic="unknown" />);
+    const icons = screen.getAllByTestId('connection-icon-unknown');
+    expect(icons).toHaveLength(2);
+    icons.forEach((icon) => {
+      expect(icon).toHaveTextContent('○');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    });
+  });
 });

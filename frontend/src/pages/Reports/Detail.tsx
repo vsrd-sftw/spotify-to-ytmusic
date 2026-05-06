@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Card, CardBody, EmptyState, Skeleton } from '@/components/ui';
 import { useReport } from '@/features/reports/useReport';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
 import type { MigrationReport } from '@/types/api';
 
 interface ReportDetailProps {
@@ -28,13 +29,18 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
   const id = report.id ?? '';
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(containerRef, true);
+  const headingRef = useAutoFocusHeading<HTMLHeadingElement>();
   const { data, isLoading, error } = useReport(id);
   const resolved = data ?? report;
 
   return (
     <div ref={containerRef} className="flex flex-col gap-4" aria-busy={isLoading}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-lg font-semibold text-gray-900 outline-none"
+        >
           {resolved.id ? `Reporte ${resolved.id.slice(0, 8)}` : 'Detalle del reporte'}
         </h2>
         <div className="flex gap-2">

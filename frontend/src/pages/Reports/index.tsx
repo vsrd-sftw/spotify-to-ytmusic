@@ -2,14 +2,23 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ReportsList } from './List';
 import { ReportDetail } from './Detail';
 import { useReport } from '@/features/reports/useReport';
+import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
 import { EmptyState, Skeleton, Card, CardBody } from '@/components/ui';
 import { downloadJson } from '@/lib/download';
 import type { MigrationReport } from '@/types/api';
 
 export function ReportsListPage() {
   const navigate = useNavigate();
+  const headingRef = useAutoFocusHeading<HTMLHeadingElement>();
   return (
-    <div className="p-4 sm:p-6">
+    <section className="p-4 sm:p-6 flex flex-col gap-4">
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl font-semibold text-gray-900 outline-none"
+      >
+        Reportes
+      </h2>
       <ReportsList
         onSelectReport={(report) => {
           if (report.id) {
@@ -17,7 +26,7 @@ export function ReportsListPage() {
           }
         }}
       />
-    </div>
+    </section>
   );
 }
 
