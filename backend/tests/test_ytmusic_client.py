@@ -117,6 +117,14 @@ def test_add_tracks_recovers_after_one_transient_failure(ytmusic_client):
     assert ytmusic_client.yt.add_playlist_items.call_count == 2
 
 
+def test_add_tracks_passes_duplicates_true(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = {"status": "STATUS_SUCCEEDED"}
+    ytmusic_client.add_tracks_to_playlist("PL", ["v1", "v2"])
+    ytmusic_client.yt.add_playlist_items.assert_called_once_with(
+        "PL", ["v1", "v2"], duplicates=True
+    )
+
+
 def test_add_tracks_raises_chunk_error_after_max_retries(ytmusic_client):
     ytmusic_client.yt.add_playlist_items.return_value = None
     with pytest.raises(YTMusicChunkError, match="exhausted retries"):

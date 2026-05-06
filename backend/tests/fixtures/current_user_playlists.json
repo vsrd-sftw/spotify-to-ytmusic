@@ -1,0 +1,35 @@
+{
+  "items": [
+    {
+      "id": "pl_001",
+      "name": "Discover Weekly",
+      "description": "Your weekly mixtape",
+      "owner": { "id": "user_123" },
+      "items": { "total": 30 },
+      "collaborative": false,
+      "public": false
+    },
+    {
+      "id": "pl_002",
+      "name": "Liked Songs",
+      "description": "",
+      "owner": { "id": "user_123" },
+      "items": { "total": 500 },
+      "collaborative": false,
+      "public": false
+    },
+    {
+      "id": "pl_003",
+      "name": "Collab Mix",
+      "description": "Shared playlist",
+      "owner": { "id": "other_user" },
+      "items": { "total": 45 },
+      "collaborative": true,
+      "public": false
+    }
+  ],
+  "next": null,
+  "total": 3,
+  "limit": 50,
+  "offset": 0
+}

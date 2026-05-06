@@ -246,3 +246,89 @@ def test_migrate_album_emits_save_failed_event(tmp_path):
     assert len(save_failed) == 1
     assert save_failed[0].label == "Radiohead - In Rainbows"
     assert "save forbidden" in save_failed[0].reason
+
+
+# --- Event ordering --------------------------------------------------------
+
+
+def test_migrator_emits_events_in_correct_order(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_current_user_id.return_value = "u"
+    spotify.list_playlist_summaries.return_value = [_summary("p1", "P1")]
+    spotify.load_playlist_by_id.return_value = Playlist(
+        id="p1", name="P1", description="d", tracks=[_track("S", spot_id="t1")]
+    )
+    ytmusic.search_song.return_value = "VID"
+    ytmusic.create_playlist.return_value = "PL"
+    ytmusic.add_tracks_to_playlist.return_value = None
+
+    spotify.get_saved_albums.return_value = [
+        Album(name="A", artist="B", spotify_id="a1"),
+    ]
+    ytmusic.search_album.return_value = {"browseId": "BR"}
+    ytmusic.save_album.return_value = True
+
+    migrator.migrate_playlists()
+    migrator.migrate_albums()
+
+    event_types = [type(e).__name__ for e in events]
+    assert event_types.index("PlaylistsDiscovered") < event_types.index("PlaylistStarted")
+    assert event_types.index("PlaylistStarted") < event_types.index("PlaylistFinished")
+    assert event_types.index("AlbumsDiscovered") < event_types.index("AlbumProcessed")
+
+
+# --- Cache hits ------------------------------------------------------------
+
+
+def test_migrator_uses_cache_hit_skips_search(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    cache.set_hit("t1", "CACHED_VID")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_current_user_id.return_value = "u"
+    spotify.list_playlist_summaries.return_value = [_summary("p1", "P1")]
+    spotify.load_playlist_by_id.return_value = Playlist(
+        id="p1", name="P1", description="d", tracks=[_track("S", spot_id="t1")]
+    )
+    ytmusic.create_playlist.return_value = "PL"
+    ytmusic.add_tracks_to_playlist.return_value = None
+
+    migrator.migrate_playlists()
+
+    ytmusic.search_song.assert_not_called()
+    [finished] = [e for e in events if type(e).__name__ == "PlaylistFinished"]
+    assert finished.found == 1
+
+
+# --- Empty spotify_id bypasses cache ---------------------------------------
+
+
+def test_migrator_handles_empty_spotify_id(tmp_path):
+    events: list = []
+    spotify = MagicMock()
+    ytmusic = MagicMock()
+    cache = TrackCache(tmp_path / "cache.json")
+    migrator = Migrator(spotify=spotify, ytmusic=ytmusic, cache=cache, on_event=events.append)
+
+    spotify.get_current_user_id.return_value = "u"
+    spotify.list_playlist_summaries.return_value = [_summary("p1", "P1")]
+    spotify.load_playlist_by_id.return_value = Playlist(
+        id="p1", name="P1", description="d", tracks=[_track("Local File", spot_id="")]
+    )
+    ytmusic.search_song.return_value = "VID_LOCAL"
+    ytmusic.create_playlist.return_value = "PL"
+    ytmusic.add_tracks_to_playlist.return_value = None
+
+    migrator.migrate_playlists()
+
+    ytmusic.search_song.assert_called_once()
+    [finished] = [e for e in events if type(e).__name__ == "PlaylistFinished"]
+    assert finished.found == 1
