@@ -22,8 +22,8 @@ export function LibraryPage() {
   const { data: playlists = [] } = usePlaylists();
   const { data: albums = [] } = useAlbums();
 
-  const playlistSelection = useSelection(playlists, (p) => p.id);
-  const albumSelection = useSelection(albums, (a) => a.spotifyId);
+  const playlistSelection = useSelection(playlists, (p) => p.id, 'playlists');
+  const albumSelection = useSelection(albums, (a) => a.spotifyId, 'albums');
 
   const migration = useMigrationSelection(playlistSelection.selectedIds, albumSelection.selectedIds);
 

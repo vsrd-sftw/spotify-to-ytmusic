@@ -4,22 +4,27 @@ import { useSelection } from '@/features/library';
 import { useMigrationSelection, useStartMigration } from '@/features/migrate';
 import { usePlaylists } from '@/features/library/usePlaylists';
 import { useAlbums } from '@/features/library/useAlbums';
+import { useSelectionContext } from '@/contexts/useSelectionContext';
 import { EventLog } from './EventLog';
 
 export function MigratePage() {
   const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
+  const { clearAll } = useSelectionContext();
 
   const { data: playlists = [] } = usePlaylists();
   const { data: albums = [] } = useAlbums();
 
-  const playlistSelection = useSelection(playlists, (p) => p.id);
-  const albumSelection = useSelection(albums, (a) => a.spotifyId);
+  const playlistSelection = useSelection(playlists, (p) => p.id, 'playlists');
+  const albumSelection = useSelection(albums, (a) => a.spotifyId, 'albums');
 
   const migration = useMigrationSelection(playlistSelection.selectedIds, albumSelection.selectedIds);
 
   const startMigration = useStartMigration({
-    onSuccess: (newJobId) => setJobId(newJobId),
+    onSuccess: (newJobId) => {
+      setJobId(newJobId);
+      clearAll();
+    },
   });
 
   if (migration.isEmpty && !jobId) {
