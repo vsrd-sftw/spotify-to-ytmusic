@@ -1,6 +1,7 @@
-export { ToastProvider, useToast } from '../../lib/toast'
-export type { ToastProviderProps } from '../../lib/toast'
-import { useToast, type Toast } from '../../lib/toast'
+import { useToast } from '../../lib/useToast'
+import type { Toast } from '../../lib/ToastContextValue'
+export { ToastProvider } from '../../lib/ToastContext'
+export type { ToastProviderProps } from '../../lib/ToastContextValue'
 
 const typeStyles = {
   success: 'bg-green-50 border-green-200 text-green-800',
