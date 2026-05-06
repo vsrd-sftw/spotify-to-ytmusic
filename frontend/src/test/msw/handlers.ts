@@ -49,3 +49,18 @@ export const spotifyAuthErrorHandler = http.post(
   '*/api/auth/spotify',
   () => HttpResponse.json({ message: 'Error de configuración' }, { status: 500 }),
 );
+
+export const ytmusicAuthErrorHandler = http.post(
+  '*/api/auth/ytmusic',
+  () => HttpResponse.json({ message: 'Error al guardar headers' }, { status: 500 }),
+);
+
+export const playlistsErrorHandler = http.get(
+  '*/api/playlists',
+  () => HttpResponse.json({ message: 'Error al cargar playlists' }, { status: 500 }),
+);
+
+export const healthWithServicesHandler = http.get(
+  '*/api/health',
+  () => HttpResponse.json({ ok: true, spotify: true, ytmusic: false }),
+);
