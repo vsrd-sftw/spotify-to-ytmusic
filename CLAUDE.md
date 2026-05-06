@@ -72,6 +72,16 @@ in git history, so check the relevant commit before "improving" any of this.
   surfacing as `JSONDecodeError`. The fix is exponential backoff in
   [ytmusic_client.py `_add_chunk_with_retry`](backend/src/spotify_to_ytmusic/core/ytmusic_client.py).
   Don't catch and silently ignore — silent drops cost the user data.
+- **`YTMusicClient` distinguishes transient from fatal errors.** Public
+  methods can raise `YTMusicTransientError` (network/throttle, retries
+  already exhausted) or `YTMusicFatalError` (auth, 4xx, anything not
+  classified as transient). Never write `except Exception: return None`
+  in this module — use `_classify_exception` so fatals propagate
+  immediately instead of burning the retry budget. The `Migrator`
+  catches `YTMusicFatalError` per playlist/album and records the reason
+  in `MigrationReport.error` so the user sees why the item failed.
+  `YTMusicAuthError` is reserved for the construction-time check in
+  `_verify_auth`.
 - **403s from `playlist_tracks` are normal** for playlists the user doesn't
   fully own (e.g. some collaborative or algorithmic ones). `load_playlist_by_id`
   returns `None` in that case; the migrator just skips the playlist.
