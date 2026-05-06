@@ -1,8 +1,11 @@
 """YouTube Music client wrapping ytmusicapi with retry/normalization logic."""
+import json
 import time
 from typing import Optional
 
+import requests
 from ytmusicapi import YTMusic
+from ytmusicapi.exceptions import YTMusicServerError, YTMusicUserError
 
 from spotify_to_ytmusic.core.config import (
     BROWSER_AUTH_FILE,
@@ -16,7 +19,44 @@ from spotify_to_ytmusic.core.text import normalize
 
 
 class YTMusicAuthError(RuntimeError):
-    pass
+    """Raised on construction when the browser session is invalid/expired."""
+
+
+class YTMusicTransientError(RuntimeError):
+    """Network blips, throttling, or partial JSON responses. Retried with backoff."""
+
+
+class YTMusicFatalError(RuntimeError):
+    """Auth/quota/4xx persistent failures. Propagate so the Migrator decides what to skip."""
+
+
+def _classify_exception(exc: BaseException) -> type:
+    """Map a caught exception to the kind we treat it as.
+
+    Anything we cannot positively identify as transient is fatal: silent
+    retries on unknown errors burn quota and hide real bugs.
+    """
+    if isinstance(exc, json.JSONDecodeError):
+        return YTMusicTransientError
+    if isinstance(
+        exc,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        ),
+    ):
+        return YTMusicTransientError
+    if isinstance(exc, requests.exceptions.HTTPError):
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status is not None and status >= 500:
+            return YTMusicTransientError
+        return YTMusicFatalError
+    if isinstance(exc, YTMusicServerError):
+        return YTMusicTransientError
+    if isinstance(exc, YTMusicUserError):
+        return YTMusicFatalError
+    return YTMusicFatalError
 
 
 class YTMusicClient:
@@ -79,7 +119,13 @@ class YTMusicClient:
         for query in queries:
             try:
                 results = self.yt.search(query, **search_kwargs)
-            except Exception:
+            except Exception as exc:
+                if _classify_exception(exc) is YTMusicFatalError:
+                    raise YTMusicFatalError(
+                        f"Search failed for query {query!r}: "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+                # Transient: skip this query variant and try the next one.
                 continue
 
             preferred = self._find_artist_match(results, id_field, normalized_artist)
@@ -111,17 +157,27 @@ class YTMusicClient:
 
     def create_playlist(
         self, name: str, description: str, video_ids: list[str]
-    ) -> Optional[str]:
+    ) -> str:
         try:
             playlist_id = self.yt.create_playlist(name, description)
-        except Exception:
-            return None
+        except Exception as exc:
+            raise YTMusicFatalError(
+                f"Failed to create playlist {name!r}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        if not playlist_id or not isinstance(playlist_id, str):
+            # Some ytmusicapi failure modes return a status dict instead of an
+            # id. Treat that as fatal: there is nothing to add tracks to.
+            raise YTMusicFatalError(
+                f"create_playlist returned invalid id for {name!r}: "
+                f"{playlist_id!r}"
+            )
         for chunk in self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE):
             self._add_chunk_with_retry(playlist_id, chunk)
             time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
         return playlist_id
 
-    def _add_chunk_with_retry(self, playlist_id: str, chunk: list[str]) -> bool:
+    def _add_chunk_with_retry(self, playlist_id: str, chunk: list[str]) -> None:
         # YT Music throttles add_playlist_items intermittently and the response
         # comes back empty, surfacing as a JSONDecodeError. The failure is
         # transient: a backoff retry recovers the same chunk.
@@ -129,21 +185,33 @@ class YTMusicClient:
         # chunk on any duplicate videoId (Spotify allows repeats and YT search
         # can collapse distinct tracks to the same id).
         delay = YTMUSIC_ADD_ITEMS_BACKOFF_BASE_S
+        last_response: object = None
+        last_exc: Exception | None = None
         for attempt in range(1, YTMUSIC_ADD_ITEMS_MAX_RETRIES + 1):
             try:
                 response = self.yt.add_playlist_items(
                     playlist_id, chunk, duplicates=True
                 )
-            except Exception:
+            except Exception as exc:
+                if _classify_exception(exc) is YTMusicFatalError:
+                    raise YTMusicFatalError(
+                        f"Failed to add chunk to playlist {playlist_id}: "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+                last_exc = exc
                 response = None
-            if isinstance(response, dict) and str(response.get("status", "")).startswith(
-                "STATUS_SUCCEEDED"
-            ):
-                return True
+            last_response = response
+            if isinstance(response, dict) and str(
+                response.get("status", "")
+            ).startswith("STATUS_SUCCEEDED"):
+                return
             if attempt < YTMUSIC_ADD_ITEMS_MAX_RETRIES:
                 time.sleep(delay)
                 delay *= 2
-        return False
+        raise YTMusicTransientError(
+            f"add_playlist_items exhausted retries for playlist {playlist_id} "
+            f"(last response: {last_response!r}, last exc: {last_exc!r})"
+        )
 
     @staticmethod
     def _chunked(items: list, size: int):
@@ -151,12 +219,26 @@ class YTMusicClient:
             yield items[i : i + size]
 
     def save_album(self, browse_id: str) -> bool:
-        try:
-            album = self.yt.get_album(browse_id)
-            audio_playlist_id = album.get("audioPlaylistId")
-            if not audio_playlist_id:
-                return False
-            self.yt.rate_playlist(audio_playlist_id, "LIKE")
-            return True
-        except Exception:
-            return False
+        delay = YTMUSIC_ADD_ITEMS_BACKOFF_BASE_S
+        last_exc: Exception | None = None
+        for attempt in range(1, YTMUSIC_ADD_ITEMS_MAX_RETRIES + 1):
+            try:
+                album = self.yt.get_album(browse_id)
+                audio_playlist_id = album.get("audioPlaylistId")
+                if not audio_playlist_id:
+                    return False
+                self.yt.rate_playlist(audio_playlist_id, "LIKE")
+                return True
+            except Exception as exc:
+                if _classify_exception(exc) is YTMusicFatalError:
+                    raise YTMusicFatalError(
+                        f"Failed to save album {browse_id}: "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+                last_exc = exc
+                if attempt < YTMUSIC_ADD_ITEMS_MAX_RETRIES:
+                    time.sleep(delay)
+                    delay *= 2
+        raise YTMusicTransientError(
+            f"save_album exhausted retries for {browse_id} (last exc: {last_exc!r})"
+        )

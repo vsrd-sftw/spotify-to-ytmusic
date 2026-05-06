@@ -50,12 +50,14 @@ class PlaylistMigrationResult:
     total: int
     found: int
     yt_playlist_id: str | None
+    error: str | None = None
 
 
 @dataclass
 class AlbumMigrationResult:
     label: str
     status: str  # "saved" | "found (not saved)"
+    error: str | None = None
 
 
 @dataclass

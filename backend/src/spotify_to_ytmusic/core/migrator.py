@@ -22,7 +22,11 @@ from spotify_to_ytmusic.core.models import (
 )
 from spotify_to_ytmusic.core.spotify_client import SpotifyClient
 from spotify_to_ytmusic.core.track_cache import TrackCache
-from spotify_to_ytmusic.core.ytmusic_client import YTMusicClient
+from spotify_to_ytmusic.core.ytmusic_client import (
+    YTMusicClient,
+    YTMusicFatalError,
+    YTMusicTransientError,
+)
 
 
 def _noop(_event) -> None:
@@ -73,21 +77,33 @@ class Migrator:
                     MissingItem(context=f"playlist:{playlist.name}", item=track.label)
                 )
 
-        yt_playlist_id = self.ytmusic.create_playlist(
-            playlist.name, playlist.description, video_ids
-        )
+        yt_playlist_id: str | None = None
+        error_message: str | None = None
+        try:
+            yt_playlist_id = self.ytmusic.create_playlist(
+                playlist.name, playlist.description, video_ids
+            )
+        except YTMusicFatalError as exc:
+            # Per-playlist abort: record the error and move on so a single
+            # broken playlist does not kill the whole job.
+            error_message = str(exc)
+        except YTMusicTransientError as exc:
+            error_message = f"transient (max retries exceeded): {exc}"
+
+        finished_found = len(video_ids) if error_message is None else 0
         self.report.playlists.append(
             PlaylistMigrationResult(
                 name=playlist.name,
                 total=len(playlist.tracks),
-                found=len(video_ids),
+                found=finished_found,
                 yt_playlist_id=yt_playlist_id,
+                error=error_message,
             )
         )
         self.on_event(
             PlaylistFinished(
                 name=playlist.name,
-                found=len(video_ids),
+                found=finished_found,
                 total=len(playlist.tracks),
                 not_found_labels=not_found,
             )
@@ -99,6 +115,8 @@ class Migrator:
         if hit:
             return cached
         time.sleep(YTMUSIC_SEARCH_DELAY_S)
+        # YTMusicFatalError propagates: auth/quota expired mid-job aborts the
+        # whole job. Re-running picks up where the TrackCache left off.
         video_id = self.ytmusic.search_song(track.name, track.artist)
         if track.spotify_id:
             if video_id:
@@ -115,14 +133,39 @@ class Migrator:
 
     def _migrate_album(self, album: Album) -> None:
         time.sleep(YTMUSIC_SEARCH_DELAY_S)
-        match = self.ytmusic.search_album(album.name, album.artist)
+        try:
+            match = self.ytmusic.search_album(album.name, album.artist)
+        except YTMusicFatalError as exc:
+            self.report.albums.append(
+                AlbumMigrationResult(
+                    label=album.label,
+                    status="not found",
+                    error=str(exc),
+                )
+            )
+            self.on_event(AlbumProcessed(label=album.label, status="not found"))
+            return
 
         if not match or not match.get("browseId"):
             self.report.not_found.append(MissingItem(context="album", item=album.label))
             self.on_event(AlbumProcessed(label=album.label, status="not found"))
             return
 
-        saved = self.ytmusic.save_album(match["browseId"])
+        error_message: str | None = None
+        saved = False
+        try:
+            saved = self.ytmusic.save_album(match["browseId"])
+        except YTMusicFatalError as exc:
+            error_message = str(exc)
+        except YTMusicTransientError as exc:
+            error_message = f"transient (max retries exceeded): {exc}"
+
         status = "saved" if saved else "found (not saved)"
-        self.report.albums.append(AlbumMigrationResult(label=album.label, status=status))
+        self.report.albums.append(
+            AlbumMigrationResult(
+                label=album.label,
+                status=status,
+                error=error_message,
+            )
+        )
         self.on_event(AlbumProcessed(label=album.label, status=status))
