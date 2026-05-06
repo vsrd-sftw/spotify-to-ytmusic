@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "track_101",
+        "name": "Hotel California",
+        "artists": [{ "name": "Eagles" }],
+        "album": { "name": "Hotel California" },
+        "duration_ms": 391376
+      },
+      "added_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "track": null,
+      "added_at": "2024-01-02T00:00:00Z"
+    }
+  ],
+  "next": null,
+  "total": 2,
+  "limit": 100,
+  "offset": 0
+}

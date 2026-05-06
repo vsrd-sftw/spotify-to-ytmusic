@@ -59,6 +59,16 @@ def _classify_exception(exc: BaseException) -> type:
     return YTMusicFatalError
 
 
+class YTMusicChunkError(YTMusicTransientError):
+    """A chunk of tracks failed to be added after all retries. Carries chunk metadata."""
+
+    def __init__(self, chunk_index: int, total_chunks: int, reason: str):
+        self.chunk_index = chunk_index
+        self.total_chunks = total_chunks
+        self.reason = reason
+        super().__init__(reason)
+
+
 class YTMusicClient:
     def __init__(self, auth_file: str = BROWSER_AUTH_FILE):
         self.yt = YTMusic(auth_file)
@@ -155,9 +165,7 @@ class YTMusicClient:
     def _find_first_with_id(results: list[dict], id_field: str) -> Optional[dict]:
         return next((r for r in results if r.get(id_field)), None)
 
-    def create_playlist(
-        self, name: str, description: str, video_ids: list[str]
-    ) -> str:
+    def create_playlist(self, name: str, description: str) -> str:
         try:
             playlist_id = self.yt.create_playlist(name, description)
         except Exception as exc:
@@ -166,16 +174,24 @@ class YTMusicClient:
                 f"{type(exc).__name__}: {exc}"
             ) from exc
         if not playlist_id or not isinstance(playlist_id, str):
-            # Some ytmusicapi failure modes return a status dict instead of an
-            # id. Treat that as fatal: there is nothing to add tracks to.
             raise YTMusicFatalError(
                 f"create_playlist returned invalid id for {name!r}: "
                 f"{playlist_id!r}"
             )
-        for chunk in self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE):
-            self._add_chunk_with_retry(playlist_id, chunk)
-            time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
         return playlist_id
+
+    def add_tracks_to_playlist(self, playlist_id: str, video_ids: list[str]) -> None:
+        chunks = list(self._chunked(video_ids, YTMUSIC_PLAYLIST_CHUNK_SIZE))
+        for i, chunk in enumerate(chunks):
+            try:
+                self._add_chunk_with_retry(playlist_id, chunk)
+            except YTMusicTransientError as exc:
+                raise YTMusicChunkError(
+                    chunk_index=i,
+                    total_chunks=len(chunks),
+                    reason=str(exc),
+                ) from exc
+            time.sleep(YTMUSIC_PLAYLIST_CHUNK_DELAY_S)
 
     def _add_chunk_with_retry(self, playlist_id: str, chunk: list[str]) -> None:
         # YT Music throttles add_playlist_items intermittently and the response

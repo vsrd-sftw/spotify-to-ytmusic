@@ -33,12 +33,35 @@ class AlbumProcessed:
     status: str  # "saved" | "found (not saved)" | "not found"
 
 
+@dataclass
+class PlaylistCreationFailed:
+    name: str
+    reason: str
+
+
+@dataclass
+class PlaylistChunkFailed:
+    name: str
+    chunk_index: int
+    total_chunks: int
+    reason: str
+
+
+@dataclass
+class AlbumSaveFailed:
+    label: str
+    reason: str
+
+
 MigrationEvent = Union[
     PlaylistsDiscovered,
     PlaylistStarted,
     PlaylistFinished,
     AlbumsDiscovered,
     AlbumProcessed,
+    PlaylistCreationFailed,
+    PlaylistChunkFailed,
+    AlbumSaveFailed,
 ]
 
 EventCallback = Callable[[MigrationEvent], None]

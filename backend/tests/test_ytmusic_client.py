@@ -6,6 +6,7 @@ import requests
 from ytmusicapi.exceptions import YTMusicServerError, YTMusicUserError
 
 from spotify_to_ytmusic.core.ytmusic_client import (
+    YTMusicChunkError,
     YTMusicFatalError,
     YTMusicTransientError,
     _classify_exception,
@@ -68,42 +69,96 @@ def test_create_playlist_propagates_fatal_when_yt_create_raises_user_error(
 ):
     ytmusic_client.yt.create_playlist.side_effect = YTMusicUserError("forbidden")
     with pytest.raises(YTMusicFatalError, match="Failed to create playlist"):
-        ytmusic_client.create_playlist("My PL", "desc", ["v1"])
+        ytmusic_client.create_playlist("My PL", "desc")
 
 
 def test_create_playlist_propagates_fatal_when_id_is_empty(ytmusic_client):
     ytmusic_client.yt.create_playlist.return_value = ""
     with pytest.raises(YTMusicFatalError, match="invalid id"):
-        ytmusic_client.create_playlist("My PL", "desc", ["v1"])
+        ytmusic_client.create_playlist("My PL", "desc")
 
 
 def test_create_playlist_propagates_fatal_when_id_is_dict(ytmusic_client):
-    # ytmusicapi sometimes returns a status dict instead of an id on failure.
     ytmusic_client.yt.create_playlist.return_value = {"status": "STATUS_FAILED"}
     with pytest.raises(YTMusicFatalError, match="invalid id"):
-        ytmusic_client.create_playlist("My PL", "desc", ["v1"])
+        ytmusic_client.create_playlist("My PL", "desc")
 
 
-def test_create_playlist_succeeds_when_chunk_throws_then_recovers(ytmusic_client):
+def test_create_playlist_returns_id_on_success(ytmusic_client):
     ytmusic_client.yt.create_playlist.return_value = "PL_real"
-    # First add attempt: transient JSONDecodeError. Second: success.
+    pid = ytmusic_client.create_playlist("PL", "d")
+    assert pid == "PL_real"
+
+
+# --- add_tracks_to_playlist ----------------------------------------------
+
+
+def test_add_tracks_succeeds_with_single_chunk(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = {"status": "STATUS_SUCCEEDED"}
+    ytmusic_client.add_tracks_to_playlist("PL", ["v1", "v2"])
+    assert ytmusic_client.yt.add_playlist_items.call_count == 1
+
+
+def test_add_tracks_succeeds_with_multiple_chunks(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = {"status": "STATUS_SUCCEEDED"}
+    from spotify_to_ytmusic.core.config import YTMUSIC_PLAYLIST_CHUNK_SIZE
+
+    video_ids = ["v" + str(i) for i in range(YTMUSIC_PLAYLIST_CHUNK_SIZE + 1)]
+    ytmusic_client.add_tracks_to_playlist("PL", video_ids)
+    assert ytmusic_client.yt.add_playlist_items.call_count == 2
+
+
+def test_add_tracks_recovers_after_one_transient_failure(ytmusic_client):
     ytmusic_client.yt.add_playlist_items.side_effect = [
         json.JSONDecodeError("Expecting value", "", 0),
         {"status": "STATUS_SUCCEEDED"},
     ]
-    pid = ytmusic_client.create_playlist("PL", "d", ["v1", "v2"])
-    assert pid == "PL_real"
+    ytmusic_client.add_tracks_to_playlist("PL", ["v1"])
     assert ytmusic_client.yt.add_playlist_items.call_count == 2
 
 
-def test_create_playlist_propagates_fatal_from_chunk_immediately(ytmusic_client):
-    """A fatal during add_playlist_items must NOT burn the retry budget."""
-    ytmusic_client.yt.create_playlist.return_value = "PL_real"
+def test_add_tracks_passes_duplicates_true(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = {"status": "STATUS_SUCCEEDED"}
+    ytmusic_client.add_tracks_to_playlist("PL", ["v1", "v2"])
+    ytmusic_client.yt.add_playlist_items.assert_called_once_with(
+        "PL", ["v1", "v2"], duplicates=True
+    )
+
+
+def test_add_tracks_raises_chunk_error_after_max_retries(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = None
+    with pytest.raises(YTMusicChunkError, match="exhausted retries"):
+        ytmusic_client.add_tracks_to_playlist("PL", ["v1"])
+    assert ytmusic_client.yt.add_playlist_items.call_count == 5
+
+
+def test_add_tracks_chunk_error_carries_metadata(ytmusic_client):
+    ytmusic_client.yt.add_playlist_items.return_value = None
+    with pytest.raises(YTMusicChunkError) as exc_info:
+        ytmusic_client.add_tracks_to_playlist("PL", ["v1"])
+    assert exc_info.value.chunk_index == 0
+    assert exc_info.value.total_chunks == 1
+
+
+def test_add_tracks_propagates_fatal_from_chunk_immediately(ytmusic_client):
     ytmusic_client.yt.add_playlist_items.side_effect = YTMusicUserError("forbidden")
     with pytest.raises(YTMusicFatalError, match="Failed to add chunk"):
-        ytmusic_client.create_playlist("PL", "d", ["v1"])
-    # Exactly one call: classified fatal, raised on first attempt.
+        ytmusic_client.add_tracks_to_playlist("PL", ["v1"])
     assert ytmusic_client.yt.add_playlist_items.call_count == 1
+
+
+def test_add_tracks_second_chunk_fails_wraps_in_chunk_error(ytmusic_client):
+    from spotify_to_ytmusic.core.config import YTMUSIC_PLAYLIST_CHUNK_SIZE
+
+    ytmusic_client.yt.add_playlist_items.side_effect = [
+        {"status": "STATUS_SUCCEEDED"},
+        *[None] * 5,
+    ]
+    video_ids = ["v" + str(i) for i in range(YTMUSIC_PLAYLIST_CHUNK_SIZE + 1)]
+    with pytest.raises(YTMusicChunkError) as exc_info:
+        ytmusic_client.add_tracks_to_playlist("PL", video_ids)
+    assert exc_info.value.chunk_index == 1
+    assert exc_info.value.total_chunks == 2
 
 
 # --- _add_chunk_with_retry -----------------------------------------------

@@ -5,8 +5,11 @@ from pathlib import Path
 from spotify_to_ytmusic.core.config import TRACK_CACHE_FILE, YTMUSIC_SEARCH_DELAY_S
 from spotify_to_ytmusic.core.events import (
     AlbumProcessed,
+    AlbumSaveFailed,
     AlbumsDiscovered,
     EventCallback,
+    PlaylistChunkFailed,
+    PlaylistCreationFailed,
     PlaylistFinished,
     PlaylistStarted,
     PlaylistsDiscovered,
@@ -23,6 +26,7 @@ from spotify_to_ytmusic.core.models import (
 from spotify_to_ytmusic.core.spotify_client import SpotifyClient
 from spotify_to_ytmusic.core.track_cache import TrackCache
 from spotify_to_ytmusic.core.ytmusic_client import (
+    YTMusicChunkError,
     YTMusicClient,
     YTMusicFatalError,
     YTMusicTransientError,
@@ -80,15 +84,26 @@ class Migrator:
         yt_playlist_id: str | None = None
         error_message: str | None = None
         try:
-            yt_playlist_id = self.ytmusic.create_playlist(
-                playlist.name, playlist.description, video_ids
+            yt_playlist_id = self.ytmusic.create_playlist(playlist.name, playlist.description)
+            self.ytmusic.add_tracks_to_playlist(yt_playlist_id, video_ids)
+        except YTMusicChunkError as exc:
+            error_message = f"chunk {exc.chunk_index}/{exc.total_chunks} failed: {exc.reason}"
+            self.on_event(
+                PlaylistChunkFailed(
+                    name=playlist.name,
+                    chunk_index=exc.chunk_index,
+                    total_chunks=exc.total_chunks,
+                    reason=exc.reason,
+                )
             )
         except YTMusicFatalError as exc:
-            # Per-playlist abort: record the error and move on so a single
-            # broken playlist does not kill the whole job.
             error_message = str(exc)
+            if yt_playlist_id is None:
+                self.on_event(PlaylistCreationFailed(name=playlist.name, reason=error_message))
         except YTMusicTransientError as exc:
             error_message = f"transient (max retries exceeded): {exc}"
+            if yt_playlist_id is None:
+                self.on_event(PlaylistCreationFailed(name=playlist.name, reason=error_message))
 
         finished_found = len(video_ids) if error_message is None else 0
         self.report.playlists.append(
@@ -157,8 +172,10 @@ class Migrator:
             saved = self.ytmusic.save_album(match["browseId"])
         except YTMusicFatalError as exc:
             error_message = str(exc)
+            self.on_event(AlbumSaveFailed(label=album.label, reason=error_message))
         except YTMusicTransientError as exc:
             error_message = f"transient (max retries exceeded): {exc}"
+            self.on_event(AlbumSaveFailed(label=album.label, reason=error_message))
 
         status = "saved" if saved else "found (not saved)"
         self.report.albums.append(

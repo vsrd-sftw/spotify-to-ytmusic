@@ -14,8 +14,11 @@ from spotify_to_ytmusic.core.config import (
 )
 from spotify_to_ytmusic.core.events import (
     AlbumProcessed,
+    AlbumSaveFailed,
     AlbumsDiscovered,
     MigrationEvent,
+    PlaylistChunkFailed,
+    PlaylistCreationFailed,
     PlaylistFinished,
     PlaylistStarted,
     PlaylistsDiscovered,
@@ -46,6 +49,15 @@ def _print_event(event: MigrationEvent) -> None:
         print(f"Found {event.count} saved albums\n")
     elif isinstance(event, AlbumProcessed):
         print(f"[album] {event.label}\n  {event.status}")
+    elif isinstance(event, PlaylistCreationFailed):
+        print(f"  [error] No se pudo crear la playlist '{event.name}': {event.reason}")
+    elif isinstance(event, PlaylistChunkFailed):
+        print(
+            f"  [error] Chunk {event.chunk_index + 1}/{event.total_chunks} "
+            f"fallo en '{event.name}': {event.reason}"
+        )
+    elif isinstance(event, AlbumSaveFailed):
+        print(f"  [error] No se pudo guardar el album '{event.label}': {event.reason}")
 
 
 def _select_playlists(summaries: list[PlaylistSummary]) -> list[str] | None:
