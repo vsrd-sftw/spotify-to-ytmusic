@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabPanel } from '@/components/library';
 import { SelectionSummary } from '@/components/library/SelectionSummary';
 import type { TabDef } from '@/components/library';
-import { useAppSection } from '@/hooks/useAppSection';
 import { useSelection } from '@/features/library';
 import { useMigrationSelection } from '@/features/migrate';
 import { usePlaylists } from '@/features/library/usePlaylists';
@@ -17,7 +17,7 @@ const TABS: TabDef[] = [
 
 export function LibraryPage() {
   const [activeTab, setActiveTab] = useState('playlists');
-  const { setSection } = useAppSection();
+  const navigate = useNavigate();
 
   const { data: playlists = [] } = usePlaylists();
   const { data: albums = [] } = useAlbums();
@@ -53,7 +53,7 @@ export function LibraryPage() {
       <SelectionSummary
         playlistCount={migration.playlistCount}
         albumCount={migration.albumCount}
-        onMigrate={() => setSection('migrate')}
+        onMigrate={() => navigate('/migrate')}
       />
     </section>
   );

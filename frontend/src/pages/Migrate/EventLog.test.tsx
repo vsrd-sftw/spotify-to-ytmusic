@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { EventLog } from './EventLog';
 
 vi.mock('@/hooks/useMigrationEvents', () => ({
@@ -14,19 +15,23 @@ vi.mock('@/hooks/useMigrationEvents', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useAppSection', () => ({
-  useAppSection: () => ({ setSection: vi.fn() }),
-}));
-
 describe('EventLog', () => {
   it('renders connection state badge', () => {
-    render(<EventLog jobId="job-123" />);
+    render(
+      <MemoryRouter>
+        <EventLog jobId="job-123" />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/En vivo/)).toBeInTheDocument();
   });
 
   it('renders events list', () => {
-    render(<EventLog jobId="job-123" />);
+    render(
+      <MemoryRouter>
+        <EventLog jobId="job-123" />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/Descubiertas 2 playlists/)).toBeInTheDocument();
     expect(screen.getByText(/Iniciando "My Playlist"/)).toBeInTheDocument();

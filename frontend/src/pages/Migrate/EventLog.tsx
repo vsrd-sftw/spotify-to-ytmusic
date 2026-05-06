@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMigrationEvents } from '@/hooks/useMigrationEvents';
-import { useAppSection } from '@/hooks/useAppSection';
 import { useNotFoundItems } from '@/features/migrate/useNotFoundItems';
 import { useMigrationSummary } from '@/features/migrate/useMigrationSummary';
 import { NotFound } from '@/components/migrate/NotFound';
@@ -59,7 +59,7 @@ function formatEvent(event: MigrationEvent): string {
 export function EventLog({ jobId }: EventLogProps) {
   const { events, state, retry, retryCount } = useMigrationEvents(jobId);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { setSection } = useAppSection();
+  const navigate = useNavigate();
   const { labels } = useNotFoundItems(events);
   const summary = useMigrationSummary(events);
 
@@ -104,7 +104,7 @@ export function EventLog({ jobId }: EventLogProps) {
           albumsFound={summary.albumsFound}
           albumsTotal={summary.albumsTotal}
           notFoundCount={summary.notFoundCount}
-          onViewReport={() => setSection('reports')}
+          onViewReport={() => navigate('/reports')}
         />
       ) : (
         <NotFound labels={labels} />
