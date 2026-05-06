@@ -19,6 +19,8 @@ function describeEvent(event: MigrationEvent): string {
       return `chunk ${event.chunkIndex}/${event.totalChunks} failed in ${event.name}`;
     case 'AlbumSaveFailed':
       return `failed saving ${event.label}: ${event.reason}`;
+    case 'MigrationFinished':
+      return `migration finished (report ${event.reportId})`;
   }
 }
 
@@ -39,7 +41,8 @@ describe('MigrationEvent', () => {
       { type: 'PlaylistCreationFailed', name: 'p', reason: 'err' },
       { type: 'PlaylistChunkFailed', name: 'p', chunkIndex: 0, totalChunks: 1, reason: 'err' },
       { type: 'AlbumSaveFailed', label: 'a - b', reason: 'err' },
+      { type: 'MigrationFinished', reportId: '20260306_141532' },
     ];
-    expect(events.map(describeEvent)).toHaveLength(8);
+    expect(events.map(describeEvent)).toHaveLength(9);
   });
 });
