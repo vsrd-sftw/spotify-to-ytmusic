@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { http as mswHttp, HttpResponse } from 'msw';
+import { http as mswHttp, HttpResponse, delay } from 'msw';
 import { server } from '@/test/msw/server';
 import { http, HttpError } from './http';
 
@@ -40,5 +40,19 @@ describe('http client', () => {
     );
     const data = await http.post<{ got: string }>('/echo', { hello: 'world' });
     expect(data).toEqual({ got: 'world' });
+  });
+
+  it('rejects with abort/timeout error when timeoutMs is exceeded', async () => {
+    server.use(
+      mswHttp.get('*/api/slow', async () => {
+        await delay(200);
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    const promise = http.get('/slow', { timeoutMs: 30 });
+    await expect(promise).rejects.toMatchObject({
+      name: expect.stringMatching(/^(TimeoutError|AbortError)$/),
+    });
+    await expect(promise).rejects.not.toBeInstanceOf(HttpError);
   });
 });

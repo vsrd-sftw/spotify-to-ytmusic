@@ -3,9 +3,9 @@ import { useMigrationEvents } from '@/hooks/useMigrationEvents';
 import { useAppSection } from '@/hooks/useAppSection';
 import { useNotFoundItems } from '@/features/migrate/useNotFoundItems';
 import { useMigrationSummary } from '@/features/migrate/useMigrationSummary';
-import { NotFound } from '@/components/Migrate/NotFound';
-import { CompletionSummary } from '@/components/Migrate/CompletionSummary';
-import { ConnectionBanner } from '@/components/Migrate/ConnectionBanner';
+import { NotFound } from '@/components/migrate/NotFound';
+import { CompletionSummary } from '@/components/migrate/CompletionSummary';
+import { ConnectionBanner } from '@/components/migrate/ConnectionBanner';
 import type { WsState } from '@/hooks/useMigrationEvents';
 import type { MigrationEvent } from '@/types/api';
 

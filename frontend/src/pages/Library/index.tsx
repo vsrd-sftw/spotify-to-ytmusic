@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Tabs, TabPanel } from '@/components/Library';
-import { SelectionSummary } from '@/components/Library/SelectionSummary';
-import type { TabDef } from '@/components/Library';
+import { Tabs, TabPanel } from '@/components/library';
+import { SelectionSummary } from '@/components/library/SelectionSummary';
+import type { TabDef } from '@/components/library';
 import { useAppSection } from '@/hooks/useAppSection';
 import { useSelection } from '@/features/library';
 import { useMigrationSelection } from '@/features/migrate';
