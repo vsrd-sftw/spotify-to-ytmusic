@@ -23,7 +23,7 @@ This is a monorepo:
   migration with live WebSocket progress, and browse or delete reports.
 - **Desktop app (Windows):** the Tauri 2 wrapper builds and installs
   correctly. Spotify OAuth connects (port 53000). Some known issues remain:
-  YT Music auth may hang, library loading freezes the UI, and the OAuth
+  YT Music auth doesn't work, library loading freezes the UI, and the OAuth
   callback page has no return path. See [open issues labeled `desktop`]
   (https://github.com/vsrd-sftw/spotify-to-ytmusic/issues?q=is%3Aopen+label%3Adesktop).
   CI produces `.msi` and `.exe` installers on every `v*` tag push.
