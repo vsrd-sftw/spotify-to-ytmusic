@@ -4,6 +4,10 @@ import { server } from '@/test/msw/server';
 import { spotifyAuthErrorHandler } from '@/test/msw/handlers';
 import { SpotifyConnect } from './Spotify';
 
+vi.mock('@/features/auth/useSpotifySetup', () => ({
+  useSpotifySetup: () => ({ configured: true, state: 'idle' as const, errorMessage: null, save: vi.fn() }),
+}));
+
 let assignSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {

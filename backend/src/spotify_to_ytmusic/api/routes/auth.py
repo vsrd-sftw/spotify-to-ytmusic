@@ -8,6 +8,7 @@ from spotify_to_ytmusic.api.models import AuthUrlResponse, ErrorResponse, OkResp
 from spotify_to_ytmusic.api.state import state_store
 from spotify_to_ytmusic.core.config import (
     BROWSER_AUTH_FILE,
+    SPOTIFY_CREDENTIALS_FILE,
     SPOTIFY_TOKEN_CACHE_FILE,
 )
 
@@ -97,4 +98,56 @@ async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
 
     normalized = normalize_headers(headers)
     setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized)
+    return OkResponse(ok=True)
+
+
+# ---- Spotify credentials persistence (desktop app) ----
+
+import json
+import os as _os
+
+
+def _load_spotify_credentials() -> dict[str, str] | None:
+    if not _os.path.isfile(SPOTIFY_CREDENTIALS_FILE):
+        return None
+    try:
+        with open(SPOTIFY_CREDENTIALS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data.get("client_id"), str) and isinstance(data.get("client_secret"), str):
+            return data
+    except (OSError, json.JSONDecodeError):
+        pass
+    return None
+
+
+def load_persisted_credentials() -> None:
+    """Load Spotify credentials from disk into environment variables.
+
+    Called on server startup so ``os.getenv`` picks them up.
+    Existing env vars take precedence over the persisted file.
+    """
+    if _os.getenv("SPOTIFY_CLIENT_ID"):
+        return
+    data = _load_spotify_credentials()
+    if data:
+        _os.environ["SPOTIFY_CLIENT_ID"] = data["client_id"]
+        _os.environ["SPOTIFY_CLIENT_SECRET"] = data["client_secret"]
+
+
+@router.get("/auth/spotify/setup")
+async def get_spotify_setup() -> dict:
+    data = _load_spotify_credentials()
+    return {"configured": data is not None}
+
+
+@router.post("/auth/spotify/setup")
+async def post_spotify_setup(body: dict) -> OkResponse | ErrorResponse:
+    client_id = (body.get("client_id") or "").strip()
+    client_secret = (body.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
+        return ErrorResponse(message="client_id y client_secret son obligatorios.")
+    with open(SPOTIFY_CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+        json.dump({"client_id": client_id, "client_secret": client_secret}, f)
+    _os.environ["SPOTIFY_CLIENT_ID"] = client_id
+    _os.environ["SPOTIFY_CLIENT_SECRET"] = client_secret
     return OkResponse(ok=True)
