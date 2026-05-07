@@ -84,9 +84,12 @@ pub fn run() {
 
             Ok(())
         })
-        .on_event(|app, event| {
-            if let tauri::RunEvent::ExitRequested { .. } = event {
-                if let Some(state) = app.try_state::<SidecarState>() {
+        .invoke_handler(tauri::generate_handler![get_server_port, proxy_request])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app_handle.try_state::<SidecarState>() {
                     if let Ok(mut child) = state.child.lock() {
                         if let Some(c) = child.take() {
                             let _ = c.kill();
@@ -94,10 +97,7 @@ pub fn run() {
                     }
                 }
             }
-        })
-        .invoke_handler(tauri::generate_handler![get_server_port, proxy_request])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        });
 }
 
 async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error::Error>> {
