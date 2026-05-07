@@ -7,6 +7,10 @@ import os
 import socket
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import uvicorn
 
 

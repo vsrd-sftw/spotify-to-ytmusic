@@ -1,6 +1,10 @@
 """Entrypoint: python -m spotify_to_ytmusic.api.server"""
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import uvicorn
 
 
