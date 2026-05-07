@@ -18,6 +18,7 @@ fn get_server_port(state: tauri::State<SidecarState>) -> u16 {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let port = if cfg!(debug_assertions) {
                 8000u16
