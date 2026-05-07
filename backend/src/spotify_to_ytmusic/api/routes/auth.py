@@ -174,3 +174,12 @@ async def post_spotify_setup(body: dict) -> OkResponse | ErrorResponse:
     _os.environ["SPOTIFY_CLIENT_ID"] = client_id
     _os.environ["SPOTIFY_CLIENT_SECRET"] = client_secret
     return OkResponse(ok=True)
+
+
+@router.delete("/auth/spotify/setup")
+async def delete_spotify_setup() -> OkResponse:
+    if _os.path.isfile(SPOTIFY_CREDENTIALS_FILE):
+        _os.remove(SPOTIFY_CREDENTIALS_FILE)
+    _os.environ.pop("SPOTIFY_CLIENT_ID", None)
+    _os.environ.pop("SPOTIFY_CLIENT_SECRET", None)
+    return OkResponse(ok=True)
