@@ -67,6 +67,15 @@ def load_report(report_id: str, directory: Path | str | None = None) -> Migratio
     return _parse_report(data, report_id)
 
 
+def delete_report(report_id: str, directory: Path | str | None = None) -> bool:
+    target_dir = Path(directory) if directory is not None else DATA_DIR
+    path = target_dir / f"migration_report_{report_id}.json"
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
 def _parse_report(data: dict, report_id: str) -> MigrationReport:
     return MigrationReport(
         id=report_id,

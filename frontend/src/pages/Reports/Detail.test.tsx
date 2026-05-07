@@ -107,6 +107,38 @@ describe('ReportDetail', () => {
     });
   });
 
+  it('shows delete button', async () => {
+    renderDetail({ onClose: vi.fn() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Eliminar reporte')).toBeInTheDocument();
+    });
+  });
+
+  it('calls delete and onClose on delete button click', async () => {
+    const onClose = vi.fn();
+    let deleteCalled = false;
+    server.use(
+      http.delete('*/api/reports/:id', () => {
+        deleteCalled = true;
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+
+    renderDetail({ onClose, onDownload: vi.fn() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Eliminar reporte')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Eliminar reporte'));
+
+    await waitFor(() => {
+      expect(deleteCalled).toBe(true);
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
   it('shows empty messages when sections are empty', async () => {
     const emptyReport = { id: 'empty', playlists: [], albums: [], notFound: [] };
     server.use(

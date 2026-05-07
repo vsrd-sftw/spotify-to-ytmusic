@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Card, CardBody, EmptyState, Skeleton } from '@/components/ui';
 import { useReport } from '@/features/reports/useReport';
+import { useDeleteReport } from '@/features/reports/useDeleteReport';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
 import type { MigrationReport } from '@/types/api';
@@ -32,6 +33,7 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
   const headingRef = useAutoFocusHeading<HTMLHeadingElement>();
   const { data, isLoading, error } = useReport(id);
   const resolved = data ?? report;
+  const deleteMutation = useDeleteReport();
 
   return (
     <div ref={containerRef} className="flex flex-col gap-4" aria-busy={isLoading}>
@@ -53,6 +55,18 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
               Descargar JSON
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              deleteMutation.mutate(id, {
+                onSuccess: () => onClose(),
+              });
+            }}
+            disabled={deleteMutation.isPending}
+            className="px-3 py-1.5 text-sm font-medium text-red-400 border border-red-800 rounded-md hover:bg-red-900/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
+          >
+            {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar reporte'}
+          </button>
           <button
             type="button"
             onClick={onClose}

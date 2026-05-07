@@ -1,4 +1,4 @@
-"""Tests for atomic report writes."""
+"""Tests for atomic report writes and delete_report."""
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from spotify_to_ytmusic.core.models import MigrationReport
-from spotify_to_ytmusic.core.report import save_report
+from spotify_to_ytmusic.core.report import delete_report, save_report
 
 
 def _empty_report() -> MigrationReport:
@@ -51,3 +51,31 @@ def test_save_report_cleans_orphan_tmp(tmp_path: Path):
     save_report(report, directory=tmp_path)
 
     assert not orphan.exists()
+
+
+class TestDeleteReport:
+    def test_delete_existing_report(self, tmp_path: Path):
+        report_id = "20250101_000000"
+        path = tmp_path / f"migration_report_{report_id}.json"
+        path.write_text(json.dumps({"playlists": [], "albums": [], "not_found": []}))
+
+        assert path.exists()
+        result = delete_report(report_id, directory=tmp_path)
+
+        assert result is True
+        assert not path.exists()
+
+    def test_delete_nonexistent_report(self, tmp_path: Path):
+        result = delete_report("nonexistent", directory=tmp_path)
+        assert result is False
+
+    def test_delete_idempotent(self, tmp_path: Path):
+        report_id = "20250101_000000"
+        path = tmp_path / f"migration_report_{report_id}.json"
+        path.write_text(json.dumps({"playlists": [], "albums": [], "not_found": []}))
+
+        first = delete_report(report_id, directory=tmp_path)
+        second = delete_report(report_id, directory=tmp_path)
+
+        assert first is True
+        assert second is False

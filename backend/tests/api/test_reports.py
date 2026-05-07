@@ -1,4 +1,4 @@
-"""Integration tests for /api/reports and /api/reports/:id."""
+"""Integration tests for /api/reports, /api/reports/:id, and DELETE /api/reports/:id."""
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -132,6 +132,24 @@ async def test_get_report_by_id(client):
 async def test_get_report_by_id_404(client):
     with patch("spotify_to_ytmusic.api.routes.reports.load_report", return_value=None):
         resp = await client.get("/api/reports/nonexistent")
+        assert resp.status_code == 404
+        data = resp.json()
+        assert "message" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_report_returns_200(client):
+    with patch("spotify_to_ytmusic.api.routes.reports.delete_report", return_value=True):
+        resp = await client.delete("/api/reports/20260306_141532")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_delete_report_returns_404(client):
+    with patch("spotify_to_ytmusic.api.routes.reports.delete_report", return_value=False):
+        resp = await client.delete("/api/reports/nonexistent")
         assert resp.status_code == 404
         data = resp.json()
         assert "message" in data["detail"]
