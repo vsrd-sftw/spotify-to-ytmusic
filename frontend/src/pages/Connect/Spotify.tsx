@@ -5,25 +5,24 @@ import { useSpotifyAuth } from '@/features/auth/useSpotifyAuth'
 import { useSpotifySetup } from '@/features/auth/useSpotifySetup'
 import { useHealth, useInvalidateHealth } from '@/features/auth/useHealth'
 
+const REDIRECT_URI = 'http://127.0.0.1:5173/api/auth/spotify/callback'
+
 export function SpotifyConnect() {
   const { state, errorMessage, connect } = useSpotifyAuth()
-  const {
-    configured,
-    state: setupState,
-    errorMessage: setupError,
-    save,
-  } = useSpotifySetup()
+  const { configured, state: setupState, errorMessage: setupError, save, reset } = useSpotifySetup()
   const { spotify } = useHealth()
   const invalidateHealth = useInvalidateHealth()
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
-  const [callbackError, setCallbackError] = useState<string | null>(null)
-
-  useEffect(() => {
+  const [callbackError] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
     const err = params.get('error')
-    if (err) {
-      setCallbackError(decodeURIComponent(err))
+    return err ? decodeURIComponent(err) : null
+  })
+  const [showCredentials, setShowCredentials] = useState(false)
+
+  useEffect(() => {
+    if (window.location.search) {
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
@@ -31,18 +30,19 @@ export function SpotifyConnect() {
   const isConnected = spotify === 'connected'
 
   const disconnect = useCallback(() => {
-    http.delete('/auth/spotify').then(() => invalidateHealth());
-  }, [invalidateHealth]);
+    http.delete('/auth/spotify').then(() => invalidateHealth())
+  }, [invalidateHealth])
+
+  const handleReset = useCallback(() => {
+    reset()
+    setShowCredentials(true)
+  }, [reset])
+
+  const isShowingCredentials = showCredentials || configured === false
 
   return (
-    <section
-      aria-labelledby="spotify-connect-heading"
-      className="flex flex-col gap-4 p-8"
-    >
-      <h2
-        id="spotify-connect-heading"
-        className="text-xl font-semibold text-gray-100"
-      >
+    <section aria-labelledby="spotify-connect-heading" className="flex flex-col gap-4 p-8">
+      <h2 id="spotify-connect-heading" className="text-xl font-semibold text-gray-100">
         Conectar Spotify
       </h2>
 
@@ -68,11 +68,10 @@ export function SpotifyConnect() {
         </div>
       ) : (
         <>
-          {configured === false && (
+          {isShowingCredentials && (
             <div className="flex flex-col gap-3 rounded-md border border-gray-700 p-4">
               <p className="text-sm text-gray-400">
-                Configura tus credenciales de desarrollador de Spotify. Puedes
-                obtenerlas en el{' '}
+                Configura tus credenciales de desarrollador de Spotify. Puedes obtenerlas en el{' '}
                 <a
                   href="https://developer.spotify.com/dashboard"
                   target="_blank"
@@ -82,6 +81,11 @@ export function SpotifyConnect() {
                   Dashboard de Spotify
                 </a>
                 .
+              </p>
+              <p className="text-sm text-amber-300">
+                Importante: agrega{' '}
+                <code className="rounded bg-gray-800 px-1.5 py-0.5 text-xs">{REDIRECT_URI}</code>{' '}
+                como Redirect URI en "Edit Settings" de tu app en el Dashboard de Spotify.
               </p>
               <div className="flex flex-col gap-1">
                 <Label>Client ID</Label>
@@ -109,34 +113,38 @@ export function SpotifyConnect() {
                   Guardar credenciales
                 </Button>
               </div>
-              {setupState === 'error' && setupError && (
-                <FieldError>{setupError}</FieldError>
-              )}
+              {setupState === 'error' && setupError && <FieldError>{setupError}</FieldError>}
+            </div>
+          )}
+
+          {configured === true && !isShowingCredentials && (
+            <div>
+              <Button
+                onClick={handleReset}
+                variant="secondary"
+                disabled={setupState === 'resetting'}
+                loading={setupState === 'resetting'}
+              >
+                Cambiar credenciales
+              </Button>
             </div>
           )}
 
           <p className="text-sm text-gray-400">
-            Inicia sesión con tu cuenta de Spotify para que podamos leer tus
-            playlists y álbumes guardados. Serás redirigido a Spotify para
-            autorizar el acceso.
+            Inicia sesión con tu cuenta de Spotify para que podamos leer tus playlists y álbumes
+            guardados. Serás redirigido a Spotify para autorizar el acceso.
           </p>
           <div className="flex flex-col gap-2">
             <div>
               <Button
                 onClick={connect}
-                disabled={
-                  configured !== true ||
-                  state === 'starting' ||
-                  state === 'success'
-                }
+                disabled={configured !== true || state === 'starting' || state === 'success'}
                 loading={state === 'starting'}
               >
                 Conectar con Spotify
               </Button>
             </div>
-            {state === 'error' && errorMessage && (
-              <FieldError>{errorMessage}</FieldError>
-            )}
+            {state === 'error' && errorMessage && <FieldError>{errorMessage}</FieldError>}
           </div>
         </>
       )}

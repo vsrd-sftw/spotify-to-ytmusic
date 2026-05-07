@@ -125,3 +125,77 @@ async def test_auth_ytmusic_empty_headers(client):
     assert resp.status_code == 200
     data = resp.json()
     assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_spotify_setup_get_unconfigured(client, tmp_path):
+    creds_file = tmp_path / "spotify_credentials.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.SPOTIFY_CREDENTIALS_FILE", str(creds_file)):
+        resp = await client.get("/api/auth/spotify/setup")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["configured"] is False
+
+
+@pytest.mark.asyncio
+async def test_spotify_setup_save_and_get_configured(client, tmp_path):
+    creds_file = tmp_path / "spotify_credentials.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.SPOTIFY_CREDENTIALS_FILE", str(creds_file)):
+        resp = await client.post(
+            "/api/auth/spotify/setup",
+            json={"client_id": "myid", "client_secret": "mysecret"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert creds_file.exists()
+
+        resp = await client.get("/api/auth/spotify/setup")
+        assert resp.json()["configured"] is True
+
+        resp = await client.delete("/api/auth/spotify/setup")
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert not creds_file.exists()
+
+        resp = await client.get("/api/auth/spotify/setup")
+        assert resp.json()["configured"] is False
+
+
+@pytest.mark.asyncio
+async def test_spotify_setup_delete_idempotent(client, tmp_path):
+    creds_file = tmp_path / "spotify_credentials.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.SPOTIFY_CREDENTIALS_FILE", str(creds_file)):
+        resp = await client.delete("/api/auth/spotify/setup")
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_spotify_setup_save_missing_fields(client, tmp_path):
+    creds_file = tmp_path / "spotify_credentials.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.SPOTIFY_CREDENTIALS_FILE", str(creds_file)):
+        resp = await client.post(
+            "/api/auth/spotify/setup",
+            json={"client_id": "", "client_secret": ""},
+        )
+        assert resp.status_code == 200
+        assert "message" in resp.json()
+        assert not creds_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_spotify_setup_delete_clears_env_vars(client, tmp_path, monkeypatch):
+    creds_file = tmp_path / "spotify_credentials.json"
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "env_id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "env_secret")
+    with patch("spotify_to_ytmusic.api.routes.auth.SPOTIFY_CREDENTIALS_FILE", str(creds_file)):
+        await client.post(
+            "/api/auth/spotify/setup",
+            json={"client_id": "myid", "client_secret": "mysecret"},
+        )
+        import os
+        assert os.environ.get("SPOTIFY_CLIENT_ID") == "myid"
+
+        await client.delete("/api/auth/spotify/setup")
+        assert os.environ.get("SPOTIFY_CLIENT_ID") is None
+        assert os.environ.get("SPOTIFY_CLIENT_SECRET") is None

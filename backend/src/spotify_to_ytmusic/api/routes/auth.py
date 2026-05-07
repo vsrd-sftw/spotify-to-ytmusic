@@ -79,7 +79,7 @@ async def auth_spotify_callback(request: Request, code: str = "", state: str = "
     redirect_uri = stored.get("redirect_uri")
     oauth = _get_spotify_oauth(redirect_uri=redirect_uri)
     try:
-        oauth.get_access_token(code, as_dict=True)
+        oauth.get_access_token(code, as_dict=True, check_cache=False)
     except Exception as e:
         params = urlencode({"error": f"Error al conectar con Spotify: {e}"})
         return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)
@@ -173,4 +173,13 @@ async def post_spotify_setup(body: dict) -> OkResponse | ErrorResponse:
         json.dump({"client_id": client_id, "client_secret": client_secret}, f)
     _os.environ["SPOTIFY_CLIENT_ID"] = client_id
     _os.environ["SPOTIFY_CLIENT_SECRET"] = client_secret
+    return OkResponse(ok=True)
+
+
+@router.delete("/auth/spotify/setup")
+async def delete_spotify_setup() -> OkResponse:
+    if _os.path.isfile(SPOTIFY_CREDENTIALS_FILE):
+        _os.remove(SPOTIFY_CREDENTIALS_FILE)
+    _os.environ.pop("SPOTIFY_CLIENT_ID", None)
+    _os.environ.pop("SPOTIFY_CLIENT_SECRET", None)
     return OkResponse(ok=True)
