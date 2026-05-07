@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import { http, HttpError } from '@/lib/http';
+import { useToast } from '@/lib/useToast';
+import { useInvalidateHealth } from './useHealth';
 
 export type AuthState = 'idle' | 'starting' | 'success' | 'error';
 
@@ -12,6 +14,8 @@ export interface UseSpotifyAuthResult {
 export function useSpotifyAuth(): UseSpotifyAuthResult {
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
+  const invalidateHealth = useInvalidateHealth();
 
   const connect = useCallback(() => {
     setState('starting');
@@ -21,6 +25,8 @@ export function useSpotifyAuth(): UseSpotifyAuthResult {
       .post<{ url: string }>('/auth/spotify')
       .then(({ url }) => {
         setState('success');
+        invalidateHealth();
+        toast.success('Conectado a Spotify. Serás redirigido para autorizar.');
         window.location.assign(url);
       })
       .catch((err: unknown) => {
@@ -36,7 +42,7 @@ export function useSpotifyAuth(): UseSpotifyAuthResult {
           setErrorMessage('No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.');
         }
       });
-  }, []);
+  }, [invalidateHealth, toast]);
 
   return { state, errorMessage, connect };
 }
