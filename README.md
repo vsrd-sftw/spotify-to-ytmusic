@@ -21,11 +21,13 @@ This is a monorepo:
   and the React frontend (`pnpm dev`) are fully functional. Connect your
   Spotify account, browse your library, select what to migrate, run a
   migration with live WebSocket progress, and browse or delete reports.
-- **Desktop app:** the Tauri 2 wrapper is fully functional. Run
-  `cd frontend && pnpm tauri dev` for development mode (requires the
-  FastAPI server on :8000), or build a standalone installer with
-  `pnpm tauri build`. See [PACKAGING.md](PACKAGING.md) for the full
-  production build pipeline.
+- **Desktop app (Windows):** the Tauri 2 wrapper builds and installs
+  correctly. Spotify OAuth connects (port 53000). Some known issues remain:
+  YT Music auth may hang, library loading freezes the UI, and the OAuth
+  callback page has no return path. See [open issues labeled `desktop`]
+  (https://github.com/vsrd-sftw/spotify-to-ytmusic/issues?q=is%3Aopen+label%3Adesktop).
+  CI produces `.msi` and `.exe` installers on every `v*` tag push.
+  No Python installation required — the backend runs as a compiled onefile binary.
 
 ## Features
 
@@ -156,8 +158,32 @@ spotify-to-ytmusic/
 ## Desktop app
 
 A Tauri 2 wrapper bundles the frontend and backend into a native desktop
-application. The Python backend is compiled to a standalone binary via
-PyInstaller and spawned as a sidecar — no Python installation required.
+application. The Python backend is compiled to a standalone **onefile**
+binary via PyInstaller and spawned as a sidecar — no Python installation
+required.
+
+**Architecture in production:** the frontend communicates with the sidecar
+through a Tauri IPC proxy (`invoke('proxy_request')` → Rust `ureq` → HTTP to
+`127.0.0.1:53000`). This avoids WebView2 CORS restrictions that prevent
+`fetch` from `tauri://` origins to `http://127.0.0.1`.
+
+### Spotify OAuth setup
+
+The sidecar listens on **port 53000** (fixed, outside Windows ephemeral
+range). Register the following Redirect URI in your
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard):
+
+```
+http://127.0.0.1:53000/api/auth/spotify/callback
+```
+
+### Dev mode
+
+```bash
+cd frontend && pnpm tauri dev
+```
+
+Requires the FastAPI server running on `:8000` (`python -m spotify_to_ytmusic.api.server`).
 
 ### Dev mode
 

@@ -12,8 +12,8 @@ to YouTube Music. Monorepo:
   server (`api/`). Emits typed `MigrationEvent`s ready for HTTP/WS transport.
 - **`frontend/`** — Vite/React 19 + TanStack Query + react-router-dom 7 + Tauri 2.
   Full UI (Connect, Library, Migrate, Reports). Talks to the backend via
-  Vite proxy in dev mode, or via sidecar IPC in production Tauri builds.
-  MSW mocks available for offline frontend development.
+  Vite proxy in dev mode, or via Tauri IPC (`invoke('proxy_request')`) in
+  production desktop builds. MSW mocks available for offline frontend dev.
 - **Desktop app** — Tauri 2 wraps the frontend + a PyInstaller-compiled sidecar
   binary. See [`PACKAGING.md`](PACKAGING.md).
 
@@ -68,6 +68,7 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
 
 ## Non-obvious gotchas
 
+### Spotify / YT Music APIs
 - **Spotify API shape changed in 2025-2026.** Playlist items use `"item"`
   for the track object (the legacy `"track"` key is now a boolean). Playlist
   summaries use `items.total` for the track count.
@@ -83,6 +84,8 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   playlists. `load_playlist_by_id` returns `None`; migrator skips them.
   Logs are silenced to CRITICAL in both CLI and API server.
 - **Tracks with empty `spotify_id`** (rare local files) bypass the cache.
+
+### Frontend conventions
 - **The frontend uses pnpm, not npm.** `pnpm-lock.yaml` is the source of truth.
 - **MSW path patterns must be `*/api/...`, not `/api/...`.** Relative paths
   match in browser worker but not in Vitest's Node environment.
@@ -94,15 +97,58 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
 - **Per-page focus uses `useAutoFocusHeading`.** No global heading search.
 - **`http.ts` enforces 15 s timeout** via `AbortSignal.timeout`. Go through
   `http`, not raw `fetch`.
-- **Spotify credentials persist to `DATA_DIR/spotify_credentials.json`.**
-  User sets them via the Connect page UI. `.env` takes precedence if present.
-- **`SPOTIFY_REDIRECT_URI` in `.env` is CLI-only** (`:8888`). The API server
-  always uses its own callback URL (`:5173` in dev, `:8000` in prod).
 - **Dark mode is forced** (`class="dark"` on `<html>`). Primary color is purple
   (`primary-*` Tailwind palette). Don't introduce `blue-*` or light `gray-*`
   classes.
 - **Migration page blocks navigation** while a job is running. Nav links are
   disabled and a confirmation dialog appears on exit attempts.
+
+### Desktop app (Tauri + sidecar)
+- **HTTP goes through IPC, not `fetch`.** In Tauri production mode,
+  `lib/http.ts` routes all HTTP calls through `invoke('proxy_request')` →
+  Rust `ureq` → sidecar. The WebView2 browser blocks `fetch` from
+  `tauri://localhost` to `http://127.0.0.1` (CORS/security). The IPC proxy
+  bypasses this entirely. Never use raw `fetch` in desktop-mode features.
+- **Tauri sync commands run on the MAIN THREAD.** `proxy_request` is a
+  `#[tauri::command] fn` (sync) → `ureq` blocks the main thread for up to
+  30 s. During HTTP calls the entire webview is frozen. Future fix: make it
+  `async fn` with `spawn_blocking`. Until then, keep sidecar requests fast.
+- **Sidecar port is fixed at 53000** (outside Windows ephemeral range
+  49152-65535). Using a port inside that range causes `WinError 10013`
+  (WSAEACCES). The OAuth redirect URI must match: register
+  `http://127.0.0.1:53000/api/auth/spotify/callback` in the Spotify dashboard.
+- **`SPOTIFY_TO_YTMUSIC_DATA_DIR` is set by the Tauri host** to
+  `app_data_dir()` (e.g. `%APPDATA%\com.spotify-to-ytmusic.app`). The
+  sidecar reads this env var in `config.py`. Without it, the sidecar
+  defaults to `./data` relative to its CWD (somewhere in Program Files,
+  unwritable). Credentials, cache, and reports are stored here.
+- **Sidecar cleanup on exit.** The `child` process handle is stored in
+  `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback.
+  Don't spawn the child without storing a reference to kill it.
+- **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
+  (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
+  subdirectory). The script copies it to `binaries/spotify-to-ytmusic-server-{target-triple}.exe`.
+- **PyInstaller excludes must NOT remove `email`, `html`, `http.server`,
+  `xmlrpc`.** `spotipy` → `redis` → `importlib.metadata` needs `email`;
+  `spotipy.oauth2` needs `html`. Excluding these causes
+  `ModuleNotFoundError` at sidecar startup.
+- **Tauri custom-protocol is DISABLED** (`default = []` in Cargo.toml).
+  Without it the webview uses `http://127.0.0.1:{port}` as origin, which
+  would allow `fetch` to localhost (but we proxy through IPC anyway).
+- **Release workflow is Windows-only.** `release.yml` only builds
+  `windows-latest`. Tag `v*` to trigger.
+- **Updater plugin** requires `TAURI_SIGNING_PRIVATE_KEY` and
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets configured in the repo.
+  The pubkey lives in `tauri.conf.json` under `plugins.updater.pubkey`.
+- **Spotify OAuth callback** returns an HTML page (not a redirect) because
+  the Tauri frontend port is unknown at callback time. The user must
+  manually return to the app. Future: use `shell.open()` to open Spotify
+  in the system browser instead of navigating the webview away.
+- **YT Music auth (`POST /api/auth/ytmusic`)** calls
+  `ytmusicapi.setup_browser()` which may block or hang. Avoid calling it
+  from a sync Tauri command without a timeout guard.
+- **Credenciales Spotify**: se guardan via UI en `spotify_credentials.json`.
+  El `.env` solo sirve para la CLI.
 
 ## Definition of Done
 
