@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException, status
 from spotify_to_ytmusic.api.models import (
     AlbumMigrationResultResponse,
     MissingItemResponse,
+    OkResponse,
     PlaylistMigrationResultResponse,
     ReportDetailResponse,
     ReportSummaryResponse,
 )
-from spotify_to_ytmusic.core.report import list_reports, load_report
+from spotify_to_ytmusic.core.report import delete_report, list_reports, load_report
 
 router = APIRouter(prefix="/api")
 
@@ -56,3 +57,14 @@ async def get_report(report_id: str) -> ReportDetailResponse:
             detail={"message": f"Report '{report_id}' not found"},
         )
     return _to_report_summary_response(report)
+
+
+@router.delete("/reports/{report_id}", status_code=status.HTTP_200_OK)
+async def delete_report_endpoint(report_id: str) -> OkResponse:
+    deleted = delete_report(report_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": f"Report '{report_id}' not found"},
+        )
+    return OkResponse(ok=True)

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { makeQueryWrapper } from '@/test/queryWrapper';
 import { ReportsList } from './List';
@@ -63,5 +63,53 @@ describe('ReportsList', () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
       id: sampleReport.id,
     }));
+  });
+
+  it('shows delete button on each report', async () => {
+    render(<ReportsList />, { wrapper: makeQueryWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Reporte/)).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole('button', { name: /Eliminar reporte/ });
+    expect(deleteButton).toBeInTheDocument();
+  });
+
+  it('deletes report on delete button click', async () => {
+    let deleteCalled = false;
+    server.use(
+      http.delete('*/api/reports/:id', () => {
+        deleteCalled = true;
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+
+    render(<ReportsList />, { wrapper: makeQueryWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Reporte/)).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole('button', { name: /Eliminar reporte/ });
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(deleteCalled).toBe(true);
+    });
+  });
+
+  it('delete button does not trigger onSelectReport', async () => {
+    const onSelect = vi.fn();
+    render(<ReportsList onSelectReport={onSelect} />, { wrapper: makeQueryWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Reporte/)).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole('button', { name: /Eliminar reporte/ });
+    fireEvent.click(deleteButton);
+
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

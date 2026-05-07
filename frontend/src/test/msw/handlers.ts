@@ -32,6 +32,8 @@ export const handlers = [
     HttpResponse.json({ ...sampleReport, id: params.id as string }),
   ),
 
+  http.delete('*/api/reports/:id', () => HttpResponse.json({ ok: true })),
+
   migrationEvents.addEventListener('connection', ({ client }) => {
     let i = 0;
     const interval = setInterval(() => {
