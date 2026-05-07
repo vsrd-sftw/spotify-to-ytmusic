@@ -55,7 +55,6 @@ a = Analysis(
         "test",
         "pytest",
         "unittest",
-        "email",
         "html",
         "http.server",
         "xmlrpc",
