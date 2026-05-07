@@ -110,7 +110,7 @@ async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error
         .shell()
         .sidecar("spotify-to-ytmusic-server")
         .map_err(|e| format!("sidecar binary not found: {e}"))?
-        .args(["53682"])
+        .args(["53000"])
         .env("SPOTIFY_TO_YTMUSIC_DATA_DIR", data_dir.to_string_lossy().as_ref())
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
