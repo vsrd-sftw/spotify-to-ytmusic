@@ -5,7 +5,7 @@ import { useSpotifyAuth } from '@/features/auth/useSpotifyAuth'
 import { useSpotifySetup } from '@/features/auth/useSpotifySetup'
 import { useHealth, useInvalidateHealth } from '@/features/auth/useHealth'
 
-const REDIRECT_URI = 'http://127.0.0.1:5173/api/auth/spotify/callback'
+const REDIRECT_URI = 'http://127.0.0.1:53682/api/auth/spotify/callback'
 
 export function SpotifyConnect() {
   const { state, errorMessage, connect } = useSpotifyAuth()

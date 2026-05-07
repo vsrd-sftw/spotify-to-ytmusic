@@ -57,33 +57,49 @@ async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
 def _resolve_redirect_uri(request: Request) -> str:
     """Return the callback URL that Spotify will redirect to after auth.
 
-    Routes the callback through the Vite dev proxy so the Tauri webview
-    can reach it.  Spotify only accepts ``127.0.0.1`` (not ``localhost``)
-    in redirect URIs, so we always use that form.
+    Uses the same host:port the request arrived at, so it works with
+    dynamically-assigned sidecar ports.
     """
-    origin = request.headers.get("origin", "")
-    if origin in ("tauri://localhost", "https://tauri.localhost"):
-        return "http://127.0.0.1:53682/api/auth/spotify/callback"
-    return "http://127.0.0.1:5173/api/auth/spotify/callback"
+    port = request.url.port or 8000
+    return f"http://127.0.0.1:{port}/api/auth/spotify/callback"
 
 
 @router.get("/auth/spotify/callback")
 async def auth_spotify_callback(request: Request, code: str = "", state: str = ""):
-    from urllib.parse import urlencode
+    from fastapi.responses import HTMLResponse
 
     stored = state_store.get(state)
     if not stored:
-        params = urlencode({"error": "Estado de autenticación inválido o expirado."})
-        return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)
+        return HTMLResponse(
+            content=_callback_html("Error", "Estado de autenticación inválido o expirado. Vuelve a la aplicación e inténtalo de nuevo."),
+            status_code=400,
+        )
     state_store.delete(state)
     redirect_uri = stored.get("redirect_uri")
     oauth = _get_spotify_oauth(redirect_uri=redirect_uri)
     try:
         oauth.get_access_token(code, as_dict=True, check_cache=False)
     except Exception as e:
-        params = urlencode({"error": f"Error al conectar con Spotify: {e}"})
-        return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)
-    return RedirectResponse(url="http://127.0.0.1:5173", status_code=302)
+        return HTMLResponse(
+            content=_callback_html("Error", f"Error al conectar con Spotify: {e}"),
+            status_code=400,
+        )
+    return HTMLResponse(content=_callback_html("Conectado", "Autenticación con Spotify completada. Ya puedes volver a la aplicación."))
+
+
+def _callback_html(title: str, message: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>{title}</title>
+<style>
+  body {{ font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #111; color: #e0e0e0; }}
+  .box {{ text-align: center; padding: 2rem; }}
+  h1 {{ font-size: 1.5rem; }}
+  p {{ color: #999; }}
+</style>
+</head>
+<body><div class="box"><h1>{title}</h1><p>{message}</p></div></body>
+</html>"""
 
 
 @router.post("/auth/ytmusic")
