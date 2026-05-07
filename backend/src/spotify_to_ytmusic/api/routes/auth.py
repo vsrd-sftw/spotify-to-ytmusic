@@ -83,15 +83,17 @@ async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
     headers = body.get("headers", "")
     if not isinstance(headers, str) or not headers.strip():
         return ErrorResponse(message="Pega los headers del navegador antes de continuar.")
-    lower = headers.lower()
-    if "cookie:" not in lower or "user-agent:" not in lower:
-        return ErrorResponse(
-            message="Los headers deben incluir al menos cookie: y user-agent:."
-        )
     from ytmusicapi.auth.browser import setup_browser
     from spotify_to_ytmusic.core.headers_parser import normalize_headers
 
     normalized = normalize_headers(headers)
+    if not normalized.strip():
+        return ErrorResponse(message="No se pudieron parsear los headers. Pega el bloque entero de request headers.")
+    lower = normalized.lower()
+    if "cookie:" not in lower or "user-agent:" not in lower:
+        return ErrorResponse(
+            message="Los headers deben incluir al menos cookie: y user-agent:."
+        )
     setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized)
     return OkResponse(ok=True)
 
