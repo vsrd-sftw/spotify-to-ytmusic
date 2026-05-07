@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { http, HttpError } from '@/lib/http';
 import { useToast } from '@/lib/useToast';
+import { isTauri } from '@/lib/tauri';
 import { useInvalidateHealth } from './useHealth';
 
 export type AuthState = 'idle' | 'starting' | 'success' | 'error';
@@ -9,6 +10,15 @@ export interface UseSpotifyAuthResult {
   state: AuthState;
   errorMessage: string | null;
   connect: () => void;
+}
+
+async function openAuthUrl(url: string): Promise<void> {
+  if (isTauri()) {
+    const { open } = await import('@tauri-apps/plugin-shell');
+    await open(url);
+  } else {
+    window.location.assign(url);
+  }
 }
 
 export function useSpotifyAuth(): UseSpotifyAuthResult {
@@ -26,8 +36,8 @@ export function useSpotifyAuth(): UseSpotifyAuthResult {
       .then(({ url }) => {
         setState('success');
         invalidateHealth();
-        toast.success('Conectado a Spotify. Serás redirigido para autorizar.');
-        window.location.assign(url);
+        toast.success('Abre Spotify en tu navegador para autorizar. Vuelve a la app al terminar.');
+        openAuthUrl(url);
       })
       .catch((err: unknown) => {
         setState('error');

@@ -12,45 +12,54 @@ struct ProxyResponse {
 }
 
 #[tauri::command]
-fn proxy_request(
-    state: tauri::State<SidecarState>,
+async fn proxy_request(
+    state: tauri::State<'_, SidecarState>,
     method: String,
     path: String,
     body: Option<String>,
 ) -> Result<ProxyResponse, String> {
-    let url = format!("http://127.0.0.1:{}/api{}", state.port, path);
-    let agent = ureq::AgentBuilder::new()
-        .timeout_connect(std::time::Duration::from_secs(10))
-        .timeout_read(std::time::Duration::from_secs(30))
-        .build();
+    let port = state.port;
+    let url = format!("http://127.0.0.1:{}/api{}", port, path);
 
-    let mut req = match method.to_uppercase().as_str() {
-        "GET" => agent.get(&url),
-        "POST" => agent.post(&url),
-        "DELETE" => agent.delete(&url),
-        _ => return Err(format!("unsupported method: {}", method)),
-    };
+    tauri::async_runtime::spawn_blocking(move || -> Result<ProxyResponse, String> {
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(std::time::Duration::from_secs(10))
+            .timeout_read(std::time::Duration::from_secs(30))
+            .build();
 
-    req = req.set("Content-Type", "application/json");
+        let mut req = match method.to_uppercase().as_str() {
+            "GET" => agent.get(&url),
+            "POST" => agent.post(&url),
+            "DELETE" => agent.delete(&url),
+            _ => return Err(format!("unsupported method: {}", method)),
+        };
 
-    let resp = if let Some(b) = body {
-        req.send_string(&b).map_err(|e| format!("request failed: {e}"))?
-    } else {
-        req.call().map_err(|e| format!("request failed: {e}"))?
-    };
+        req = req.set("Content-Type", "application/json");
 
-    let status = resp.status();
-    let body_str = resp
-        .into_string()
-        .map_err(|e| format!("failed to read response: {e}"))?;
+        let resp = if let Some(b) = body {
+            req.send_string(&b)
+                .map_err(|e| format!("request failed: {e}"))?
+        } else {
+            req.call()
+                .map_err(|e| format!("request failed: {e}"))?
+        };
 
-    let body_json: serde_json::Value = if body_str.is_empty() {
-        serde_json::Value::Null
-    } else {
-        serde_json::from_str(&body_str).unwrap_or(serde_json::Value::String(body_str))
-    };
+        let status = resp.status();
+        let body_str = resp
+            .into_string()
+            .map_err(|e| format!("failed to read response: {e}"))?;
 
-    Ok(ProxyResponse { status, body: body_json })
+        let body_json: serde_json::Value = if body_str.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::from_str(&body_str)
+                .unwrap_or(serde_json::Value::String(body_str))
+        };
+
+        Ok(ProxyResponse { status, body: body_json })
+    })
+    .await
+    .map_err(|e| format!("task join error: {e}"))?
 }
 
 struct SidecarState {
