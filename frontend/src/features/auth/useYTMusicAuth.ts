@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { http, HttpError } from '@/lib/http';
 import { useToast } from '@/lib/useToast';
+import { useInvalidateHealth } from './useHealth';
 
 export type AuthState = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -19,6 +20,7 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const toast = useToast();
+  const invalidateHealth = useInvalidateHealth();
 
   const connect = useCallback(
     (headers: string) => {
@@ -34,6 +36,7 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
         .post('/auth/ytmusic', { headers })
         .then(() => {
           setState('success');
+          invalidateHealth();
           toast.success('YouTube Music conectado');
         })
         .catch((err: unknown) => {

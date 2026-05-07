@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/lib/http';
 import type { HealthResponse } from '@/types/api';
 
@@ -19,7 +19,7 @@ export function useHealth(): HealthStatus {
   const { data, isLoading } = useQuery({
     queryKey: ['health'],
     queryFn: () => http.get<HealthResponse>('/health'),
-    staleTime: 10_000,
+    staleTime: 0,
     retry: false,
   });
 
@@ -31,4 +31,9 @@ export function useHealth(): HealthStatus {
     spotify: toConnectionState(data.spotify),
     ytmusic: toConnectionState(data.ytmusic),
   };
+}
+
+export function useInvalidateHealth() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: ['health'] });
 }

@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/Toast';
 import { server } from '@/test/msw/server';
 import { ytmusicAuthErrorHandler } from '@/test/msw/handlers';
@@ -8,8 +9,16 @@ import { useYTMusicAuth } from './useYTMusicAuth';
 
 const VALID_HEADERS = 'cookie: sid=abc\nuser-agent: Mozilla/5.0';
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+
 function wrapper({ children }: { children: ReactNode }) {
-  return <ToastProvider>{children}</ToastProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>{children}</ToastProvider>
+    </QueryClientProvider>
+  );
 }
 
 afterEach(() => {

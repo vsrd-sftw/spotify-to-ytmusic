@@ -1,17 +1,24 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer, ToastProvider } from '@/components/ui/Toast';
 import { server } from '@/test/msw/server';
 import { ytmusicAuthErrorHandler } from '@/test/msw/handlers';
 import { YTMusicConnect } from './YTMusic';
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+
 function wrapper({ children }: { children: ReactNode }) {
   return (
-    <ToastProvider>
-      {children}
-      <ToastContainer />
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        {children}
+        <ToastContainer />
+      </ToastProvider>
+    </QueryClientProvider>
   );
 }
 
