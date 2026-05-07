@@ -39,11 +39,17 @@ pub fn run() {
 }
 
 async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error::Error>> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("failed to resolve app data dir: {e}"))?;
+
     let (mut rx, child) = app
         .shell()
         .sidecar("spotify-to-ytmusic-server")
         .map_err(|e| format!("sidecar binary not found: {e}"))?
         .args(["0"])
+        .env("SPOTIFY_TO_YTMUSIC_DATA_DIR", data_dir.to_string_lossy().as_ref())
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
 
