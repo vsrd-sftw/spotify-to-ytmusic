@@ -140,8 +140,11 @@ class Migrator:
                 self.cache.set_miss(track.spotify_id)
         return video_id
 
-    def migrate_albums(self) -> None:
+    def migrate_albums(self, album_ids: list[str] | None = None) -> None:
         albums = self.spotify.get_saved_albums()
+        if album_ids is not None:
+            wanted = set(album_ids)
+            albums = [a for a in albums if a.spotify_id in wanted]
         self.on_event(AlbumsDiscovered(count=len(albums)))
         for album in albums:
             self._migrate_album(album)

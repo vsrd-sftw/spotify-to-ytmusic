@@ -60,7 +60,7 @@ def _run_migration(
     if playlist_ids:
         migrator.migrate_playlists(playlist_ids)
     if album_ids:
-        migrator.migrate_albums()
+        migrator.migrate_albums(album_ids)
 
     report_path = save_report(migrator.report)
     report_id = report_path.stem.replace("migration_report_", "")
