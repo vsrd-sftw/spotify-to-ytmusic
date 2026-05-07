@@ -65,7 +65,7 @@ def main() -> None:
         print("PyInstaller failed", file=sys.stderr)
         sys.exit(result.returncode)
 
-    source = REPO_ROOT / "backend" / "dist" / "spotify-to-ytmusic-server" / f"spotify-to-ytmusic-server{'.exe' if platform.system().lower() == 'windows' else ''}"
+    source = REPO_ROOT / "backend" / "dist" / f"spotify-to-ytmusic-server{'.exe' if platform.system().lower() == 'windows' else ''}"
     dest = OUTPUT_DIR / binary_name
 
     if not source.exists():
