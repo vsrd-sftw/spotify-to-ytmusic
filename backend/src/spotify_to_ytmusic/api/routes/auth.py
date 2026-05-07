@@ -41,34 +41,40 @@ def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None
 @router.post("/auth/spotify")
 async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
     state = secrets.token_urlsafe(32)
-    state_store.set(state, ttl_seconds=300)
     redirect_uri = _resolve_redirect_uri(request)
+    state_store.set(state, ttl_seconds=300, redirect_uri=redirect_uri)
     oauth = _get_spotify_oauth(state=state, redirect_uri=redirect_uri)
     url = oauth.get_authorize_url()
     return AuthUrlResponse(url=url)
 
 
-def _resolve_redirect_uri(request: Request) -> str | None:
-    """Return a desktop-friendly redirect URI when the request comes from Tauri.
+def _resolve_redirect_uri(request: Request) -> str:
+    """Return the callback URL that Spotify will redirect to after auth.
 
-    Strategy B (primary): Tauri deep link — return ``spotify-to-ytmusic://callback``.
-    Strategy A (fallback): Fixed port — return ``http://127.0.0.1:53682/api/auth/spotify/callback``.
+    For the Vite dev server the callback must go through Vite's proxy
+    (``http://localhost:5173/api/auth/spotify/callback``) because the
+    Tauri webview cannot reach ``127.0.0.1:8000`` directly.
 
-    For non-Tauri origins (browser, Vite dev server) returns ``None`` so
-    the default ``SPOTIFY_REDIRECT_URI`` env var is used.
+    For Tauri production origins a fixed port is used (the sidecar spins
+    up a mini-listener there).  Strategy B (tauri:// deep link) is the
+    long-term plan documented in docs/oauth-desktop.md.
     """
     origin = request.headers.get("origin", "")
     if origin in ("tauri://localhost", "https://tauri.localhost"):
         return "http://127.0.0.1:53682/api/auth/spotify/callback"
-    return None
+    if origin and origin.startswith("http://localhost:"):
+        return f"{origin}/api/auth/spotify/callback"
+    return "http://127.0.0.1:8000/api/auth/spotify/callback"
 
 
 @router.get("/auth/spotify/callback")
 async def auth_spotify_callback(request: Request, code: str = "", state: str = ""):
-    if not state or not state_store.get(state):
+    stored = state_store.get(state)
+    if not stored:
         return ErrorResponse(message="Estado de autenticación inválido o expirado.")
     state_store.delete(state)
-    oauth = _get_spotify_oauth()
+    redirect_uri = stored.get("redirect_uri")
+    oauth = _get_spotify_oauth(redirect_uri=redirect_uri)
     try:
         oauth.get_access_token(code, as_dict=True)
     except Exception as e:
