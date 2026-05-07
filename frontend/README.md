@@ -1,16 +1,18 @@
 # Frontend
 
-Interfaz web para `spotify-to-ytmusic`. Habla con el backend FastAPI vía
-HTTP + WebSocket bajo el prefijo `/api`.
+Interfaz para `spotify-to-ytmusic`. Habla con el backend FastAPI vía HTTP +
+WebSocket bajo el prefijo `/api`. Se empaqueta como app de escritorio con
+Tauri 2.
 
 ## Stack
 
 - **Vite 8** + **React 19** + **TypeScript**
 - **react-router-dom 7** (rutas reales: `/connect`, `/library`,
   `/migrate`, `/reports`, `/reports/:id`)
+- **Tauri 2** (desktop: sidecar + webview nativo)
 - **TanStack Query 5** para estado HTTP
-- **TailwindCSS 3** para estilos
-- **MSW 2** para mockear el backend (modo offline)
+- **TailwindCSS 3** con tema oscuro forzado y color primario morado
+- **MSW 2** para mockear el backend (modo offline/testing)
 - **Vitest** + **Testing Library** para tests
 - WebSocket nativo con reconexión exponencial
 
@@ -131,48 +133,48 @@ src/
 
 ### Patrones que NO hay que romper
 
-- **La selección vive en `SelectionContext`**, no en `useState` por
-  página. `useSelection` (en `features/library/`) delega ahí: si añades
-  una página que necesite leer la selección, lee del context, no
-  reintroduzcas estado local.
+- **La selección vive en `SelectionContext`**, no en `useState` por página.
 - **Las rutas se navegan con `<NavLink>` / `<Link>` / `useNavigate`**.
-  No vuelvas a un enum `section`.
 - **Cada página gestiona su propio focus** con `useAutoFocusHeading`.
-  No hagas un `useEffect` global en `App.tsx`.
-- **Las llamadas HTTP pasan por `lib/http.ts`** para heredar el timeout
-  de 15 s. No llames a `fetch` directamente desde features.
-- **El WS reconecta solo en cierres anormales.** `WsConnection.onclose`
-  trata `wasClean || code === 1000 || code === 1005` como cierre final.
-  Si añades streams nuevos, asegúrate de que el servidor cierra con
-  `1000` cuando termina (MSW lo hace ya, FastAPI tendrá que hacerlo
-  también — ver #70).
+- **Las llamadas HTTP pasan por `lib/http.ts`** para heredar el timeout de 15 s.
+- **El WS reconecta solo en cierres anormales** (wasClean, 1000, 1005).
+- **Dark mode forzado**: `class="dark"` en `<html>`, usar `text-gray-100/200/300`,
+  `bg-gray-700/800/900`, `border-gray-600/700`. No colores claros.
+- **Color primario**: morado (`primary-*`), no `blue-*`.
+- **Migración bloquea navegación**: `useMigrationState` + dialog de confirmación.
+- **Credenciales Spotify**: se guardan vía UI en `spotify_credentials.json`.
+  El `.env` solo sirve para la CLI.
+
+### Tauri (desktop)
+
+```bash
+# Desarrollo
+pnpm tauri dev
+
+# Producción
+python ../backend/scripts/build_sidecar.py  # compila sidecar PyInstaller
+pnpm tauri build                              # .msi / .exe
+```
+
+Ver [`PACKAGING.md`](../PACKAGING.md) para más detalles.
 
 ### Mocks (MSW)
 
-Hoy la app entera corre contra MSW. Los handlers están en
+MSW intercepta peticiones `/api/*` en modo test (`VITE_USE_MSW=true`).
+Los handlers están en
 [`src/test/msw/handlers.ts`](src/test/msw/handlers.ts) y las fixtures en
 [`src/test/msw/fixtures.ts`](src/test/msw/fixtures.ts).
-
-Los patrones de ruta **deben empezar con `*/api/...`**, no `/api/...`.
-Las rutas relativas no matchean en el entorno Node de Vitest (sí en el
-worker del navegador), y los tests fallan silenciosamente con
-`onUnhandledRequest: 'error'`.
-
-```ts
-// ✅ Match en navegador y en Node (Vitest)
-http.get('*/api/playlists', () => HttpResponse.json([...]))
-
-// ❌ Solo match en navegador
-http.get('/api/playlists', () => HttpResponse.json([...]))
-```
 
 ### Contrato con el backend
 
 | Method | Path | Quién lo consume |
 | ------ | ---- | ---------------- |
 | `GET` | `/api/health` | `useHealth` (badge en header) |
+| `GET/POST` | `/api/auth/spotify/setup` | `useSpotifySetup` (credenciales persistidas) |
 | `POST` | `/api/auth/spotify` | `useSpotifyAuth` → redirige a `accounts.spotify.com` |
+| `DELETE` | `/api/auth/spotify` | Botón desconectar en Connect |
 | `POST` | `/api/auth/ytmusic` | `useYTMusicAuth` (envía headers pegados) |
+| `DELETE` | `/api/auth/ytmusic` | Botón desconectar en Connect |
 | `GET` | `/api/playlists` | `usePlaylists` |
 | `GET` | `/api/albums` | `useAlbums` |
 | `POST` | `/api/migrate` | `useStartMigration` (devuelve `{ jobId }`) |

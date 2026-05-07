@@ -24,7 +24,7 @@ export function CompletionSummary({
         <h3 className="text-lg font-semibold text-green-800">
           Migration Completada
         </h3>
-        <div className="space-y-1 text-sm text-gray-700">
+        <div className="space-y-1 text-sm text-gray-300">
           <p>
             Pistas: {tracksFound} / {tracksTotal}
           </p>

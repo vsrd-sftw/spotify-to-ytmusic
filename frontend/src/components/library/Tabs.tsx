@@ -59,10 +59,10 @@ export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
               tabIndex={isActive ? 0 : -1}
               onClick={() => onTabChange(tab.id)}
               className={[
-                'px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                'px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 isActive
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900',
+                  ? 'border-b-2 border-primary-500 text-primary-400'
+                  : 'text-gray-400 hover:text-gray-100',
               ].join(' ')}
             >
               {tab.label}

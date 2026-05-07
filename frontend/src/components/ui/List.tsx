@@ -22,7 +22,7 @@ export function List({ children, onSelect, selectedIds = [], className = '' }: L
 
   return (
     <ListContext.Provider value={value}>
-      <ul className={['divide-y divide-gray-200', className].join(' ')}>
+      <ul className={['divide-y divide-gray-600', className].join(' ')}>
         {children}
       </ul>
     </ListContext.Provider>
@@ -51,8 +51,8 @@ export function ListItem({ id, children, className = '', onSelect }: ListItemPro
   return (
     <li
       className={[
-        'flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer',
-        isSelected && 'bg-blue-50',
+        'flex items-center gap-3 px-4 py-3 hover:bg-gray-700 cursor-pointer',
+        isSelected && 'bg-primary-900/30',
         className,
       ].join(' ')}
       onClick={handleClick}

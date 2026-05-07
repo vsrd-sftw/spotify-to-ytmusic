@@ -11,8 +11,8 @@ export function EmptyState({ title, description, illustration, cta }: EmptyState
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
       {illustration && <div aria-hidden="true">{illustration}</div>}
-      <p className="text-lg font-semibold text-gray-800">{title}</p>
-      {description && <p className="text-sm text-gray-500">{description}</p>}
+      <p className="text-lg font-semibold text-gray-200">{title}</p>
+      {description && <p className="text-sm text-gray-400">{description}</p>}
       {cta && <div>{cta}</div>}
     </div>
   )

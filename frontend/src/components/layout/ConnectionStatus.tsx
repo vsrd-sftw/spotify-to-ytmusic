@@ -6,7 +6,7 @@ interface BadgeProps {
 }
 
 const stateStyles: Record<ConnectionState, string> = {
-  unknown: 'bg-gray-100 text-gray-500',
+  unknown: 'bg-gray-700 text-gray-400',
   connected: 'bg-green-100 text-green-700',
   disconnected: 'bg-red-100 text-red-700',
 };

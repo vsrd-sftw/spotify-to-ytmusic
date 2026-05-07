@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelection } from '@/features/library';
 import { useMigrationSelection, useStartMigration } from '@/features/migrate';
@@ -6,12 +6,36 @@ import { usePlaylists } from '@/features/library/usePlaylists';
 import { useAlbums } from '@/features/library/useAlbums';
 import { useSelectionContext } from '@/contexts/useSelectionContext';
 import { useAutoFocusHeading } from '@/hooks/useAutoFocusHeading';
+import { setIsMigrating } from '@/hooks/useMigrationState';
 import { EventLog } from './EventLog';
 
 export function MigratePage() {
   const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
   const { clearAll } = useSelectionContext();
+
+  useEffect(() => {
+    if (!jobId) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [jobId]);
+
+  useEffect(() => {
+    setIsMigrating(jobId !== null);
+    return () => setIsMigrating(false);
+  }, [jobId]);
+
+  const handleNavigate = (to: string) => {
+    if (jobId) {
+      setConfirmExit(true);
+      return;
+    }
+    navigate(to);
+  };
 
   const { data: playlists = [] } = usePlaylists();
   const { data: albums = [] } = useAlbums();
@@ -39,14 +63,14 @@ export function MigratePage() {
         <h2
           ref={headingRef}
           tabIndex={-1}
-          className="text-xl font-semibold text-gray-900 outline-none"
+          className="text-xl font-semibold text-gray-100 outline-none"
         >
           Migrar
         </h2>
-        <p className="text-gray-600">No hay elementos seleccionados.</p>
+        <p className="text-gray-400">No hay elementos seleccionados.</p>
         <button
-          onClick={() => navigate('/library')}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          onClick={() => handleNavigate('/library')}
+          className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
         >
           Ir a Biblioteca
         </button>
@@ -56,16 +80,44 @@ export function MigratePage() {
 
   if (jobId) {
     return (
-      <section className="p-4 sm:p-6">
-        <h2
-          ref={headingRef}
-          tabIndex={-1}
-          className="mb-4 text-xl font-semibold text-gray-900 outline-none"
-        >
-          Migración en Progreso
-        </h2>
-        <EventLog jobId={jobId} />
-      </section>
+      <>
+        {confirmExit && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg max-w-sm mx-4">
+              <p className="text-gray-100 mb-4">
+                Hay una migración en progreso. Si sales, se interrumpirá.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmExit(false)}
+                  className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 text-gray-200"
+                >
+                  Quedarse
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmExit(false);
+                    handleNavigate('/library');
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Salir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <section className="p-4 sm:p-6">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="mb-4 text-xl font-semibold text-gray-100 outline-none"
+          >
+            Migración en Progreso
+          </h2>
+          <EventLog jobId={jobId} />
+        </section>
+      </>
     );
   }
 
@@ -74,11 +126,11 @@ export function MigratePage() {
       <h2
         ref={headingRef}
         tabIndex={-1}
-        className="text-xl font-semibold text-gray-900 outline-none"
-      >
-        Confirmar Migración
+          className="text-xl font-semibold text-gray-100 outline-none"
+        >
+          Confirmar Migración
       </h2>
-      <div className="text-gray-700">
+      <div className="text-gray-300">
         <p>¿Confirmas que quieres migrar?</p>
         <ul className="mt-2 list-disc list-inside">
           <li>Playlists: {migration.playlistCount}</li>
@@ -88,8 +140,8 @@ export function MigratePage() {
       </div>
       <div className="flex gap-2">
         <button
-          onClick={() => navigate('/library')}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+          onClick={() => handleNavigate('/library')}
+          className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700"
         >
           Cancelar
         </button>
@@ -101,7 +153,7 @@ export function MigratePage() {
             })
           }
           disabled={startMigration.isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
         >
           {startMigration.isLoading ? 'Iniciando...' : 'Iniciar Migración'}
         </button>

@@ -13,8 +13,8 @@ const STATUS_LABELS = {
 };
 
 const STATUS_STYLES = {
-  pending: 'bg-gray-100 text-gray-600',
-  in_progress: 'bg-blue-100 text-blue-700',
+  pending: 'bg-gray-700 text-gray-400',
+  in_progress: 'bg-primary-900/40 text-primary-300',
   completed: 'bg-green-100 text-green-700',
 };
 
@@ -27,7 +27,7 @@ function PlaylistCard({ playlist }: { playlist: PlaylistProgressItem }) {
     <Card className={isInProgress ? 'border-blue-300 ring-2 ring-blue-100' : ''}>
       <CardBody className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="font-medium text-gray-900 truncate">{playlist.name}</span>
+          <span className="font-medium text-gray-100 truncate">{playlist.name}</span>
           <span
             className={[
               'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -37,13 +37,13 @@ function PlaylistCard({ playlist }: { playlist: PlaylistProgressItem }) {
             {STATUS_LABELS[playlist.status]}
           </span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-600">
           <div
-            className="h-full bg-blue-600 transition-all duration-300"
+            className="h-full bg-primary-600 transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-gray-400">
           <span>
             {playlist.found} / {playlist.total} encontradas
           </span>
@@ -61,7 +61,7 @@ export function PlaylistProgress({ playlists, totalDiscovered }: PlaylistProgres
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-gray-900">
+      <h3 className="text-lg font-semibold text-gray-100">
         Playlists ({playlists.length} / {totalDiscovered})
       </h3>
       <div className="space-y-2">

@@ -23,7 +23,7 @@ const stateLabels: Record<WsState, string> = {
 const stateColors: Record<WsState, string> = {
   connecting: 'bg-yellow-100 text-yellow-800',
   open: 'bg-green-100 text-green-800',
-  closed: 'bg-gray-100 text-gray-600',
+  closed: 'bg-gray-700 text-gray-400',
   error: 'bg-red-100 text-red-800',
   reconnecting: 'bg-yellow-100 text-yellow-800',
   exhausted: 'bg-red-100 text-red-800',
@@ -93,7 +93,7 @@ export function EventLog({ jobId }: EventLogProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-600">Estado:</span>
+        <span className="text-sm text-gray-400">Estado:</span>
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${stateColors[state]}`}>
           {stateLabels[state]}
         </span>
@@ -103,13 +103,13 @@ export function EventLog({ jobId }: EventLogProps) {
         ref={containerRef}
         role="log"
         aria-live="polite"
-        className="h-64 overflow-y-auto bg-gray-50 border rounded-md p-3 font-mono text-sm"
+        className="h-64 overflow-y-auto bg-gray-800 border rounded-md p-3 font-mono text-sm"
       >
         {events.length === 0 && !isReconnecting ? (
-          <span className="text-gray-400">Esperando eventos...</span>
+          <span className="text-gray-500">Esperando eventos...</span>
         ) : (
           events.map((event, idx) => (
-            <div key={idx} className="py-0.5 text-gray-700">
+            <div key={idx} className="py-0.5 text-gray-300">
               {formatEvent(event)}
             </div>
           ))
