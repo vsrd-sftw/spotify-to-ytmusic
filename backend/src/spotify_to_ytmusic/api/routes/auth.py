@@ -114,6 +114,7 @@ async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
     if not isinstance(headers, str) or not headers.strip():
         return ErrorResponse(message="Pega los headers del navegador antes de continuar.")
     from ytmusicapi.auth.browser import setup_browser
+    from ytmusicapi.exceptions import YTMusicUserError
     from spotify_to_ytmusic.core.headers_parser import normalize_headers
 
     normalized = normalize_headers(headers)
@@ -124,7 +125,17 @@ async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
         return ErrorResponse(
             message="Los headers deben incluir al menos cookie: y user-agent:."
         )
-    setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized)
+    if "x-goog-authuser:" not in lower:
+        return ErrorResponse(
+            message='Falta el header x-goog-authuser. Copia los headers de una petición /browse '
+                    'en la pestaña Network de DevTools (F12) y asegúrate de incluir este header.'
+        )
+    try:
+        setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized)
+    except YTMusicUserError as e:
+        return ErrorResponse(message=f"Error en los headers: {e}")
+    except Exception as e:
+        return ErrorResponse(message=f"No se pudo conectar con YouTube Music: {e}")
     return OkResponse(ok=True)
 
 

@@ -109,10 +109,11 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   Rust `ureq` → sidecar. The WebView2 browser blocks `fetch` from
   `tauri://localhost` to `http://127.0.0.1` (CORS/security). The IPC proxy
   bypasses this entirely. Never use raw `fetch` in desktop-mode features.
-- **Tauri sync commands run on the MAIN THREAD.** `proxy_request` is a
-  `#[tauri::command] fn` (sync) → `ureq` blocks the main thread for up to
-  30 s. During HTTP calls the entire webview is frozen. Future fix: make it
-  `async fn` with `spawn_blocking`. Until then, keep sidecar requests fast.
+- **Tauri HTTP is async now.** `proxy_request` is `async fn` and uses
+  `spawn_blocking` so `ureq` calls run on a background thread. The main
+  thread is never blocked during HTTP. `timeoutMs` from `http.ts` is
+  propagated via `Promise.race` + `AbortController` (the Rust side also
+  has `timeout_read(30s)` as a fallback).
 - **Sidecar port is fixed at 53000** (outside Windows ephemeral range
   49152-65535). Using a port inside that range causes `WinError 10013`
   (WSAEACCES). The OAuth redirect URI must match: register
@@ -123,7 +124,9 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   defaults to `./data` relative to its CWD (somewhere in Program Files,
   unwritable). Credentials, cache, and reports are stored here.
 - **Sidecar cleanup on exit.** The `child` process handle is stored in
-  `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback.
+  `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback
+  with `eprintln!` logging at every failure point. `kill()` is followed
+  by `wait()` to ensure the process has exited before Tauri terminates.
   Don't spawn the child without storing a reference to kill it.
 - **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
   (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
@@ -140,13 +143,18 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
 - **Updater plugin** requires `TAURI_SIGNING_PRIVATE_KEY` and
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets configured in the repo.
   The pubkey lives in `tauri.conf.json` under `plugins.updater.pubkey`.
-- **Spotify OAuth callback** returns an HTML page (not a redirect) because
-  the Tauri frontend port is unknown at callback time. The user must
-  manually return to the app. Future: use `shell.open()` to open Spotify
-  in the system browser instead of navigating the webview away.
-- **YT Music auth (`POST /api/auth/ytmusic`)** calls
-  `ytmusicapi.setup_browser()` which may block or hang. Avoid calling it
-  from a sync Tauri command without a timeout guard.
+- **Spotify OAuth callback** returns an HTML page (not a redirect). The
+  frontend uses `shell.open()` to open Spotify in the system browser so
+  the Tauri webview stays on the app. After authenticating, the user
+  closes the browser tab (the callback page has a close button) and
+  returns to the Tauri app.
+- **YT Music auth (`POST /api/auth/ytmusic`)** requires the `x-goog-authuser`
+  header in addition to `cookie` and `user-agent`. The endpoint validates
+  all three before calling `ytmusicapi.setup_browser()` and wraps the call
+  in `try`/`except` to surface `YTMusicUserError` as a validation message.
+  `setup_browser()` in ytmusicapi >= 1.10 is a local-only operation (no
+  network calls). The frontend reads errors from both `body.message` and
+  `body.detail` (FastAPI fallback).
 - **Credenciales Spotify**: se guardan via UI en `spotify_credentials.json`.
   El `.env` solo sirve para la CLI.
 

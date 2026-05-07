@@ -23,17 +23,38 @@ interface ProxyResponse {
   body: unknown
 }
 
-async function tauriRequest<T>(method: string, path: string, bodyStr?: string): Promise<T> {
+async function tauriRequest<T>(method: string, path: string, bodyStr?: string, timeoutMs?: number): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core')
-  const resp: ProxyResponse = await invoke('proxy_request', {
-    method,
-    path: path.startsWith('/') ? path : `/${path}`,
-    body: bodyStr ?? null,
-  })
-  if (resp.status < 200 || resp.status >= 300) {
-    throw new HttpError(resp.status, resp.body)
+  const controller = new AbortController()
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  if (timeoutMs && timeoutMs > 0) {
+    timer = setTimeout(() => controller.abort(), timeoutMs)
   }
-  return resp.body as T
+
+  try {
+    const invokePromise = invoke('proxy_request', {
+      method,
+      path: path.startsWith('/') ? path : `/${path}`,
+      body: bodyStr ?? null,
+    }) as Promise<ProxyResponse>
+
+    const abortPromise = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener('abort', () =>
+        reject(new HttpError(0, null, `La petición excedió el tiempo de espera (${timeoutMs}ms)`)),
+        { once: true },
+      )
+    })
+
+    const resp = await Promise.race([invokePromise, abortPromise])
+
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new HttpError(resp.status, resp.body)
+    }
+    return resp.body as T
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 async function resolveUrl(path: string): Promise<string> {
@@ -94,19 +115,20 @@ function splitOptions(options?: RequestOptions): {
 
 export const http = {
   get<T>(path: string, options?: RequestOptions): Promise<T> {
-    if (isTauri()) return tauriRequest<T>('GET', path)
     const { init, timeoutMs } = splitOptions(options)
+    if (isTauri()) return tauriRequest<T>('GET', path, undefined, timeoutMs)
     return webRequest<T>(path, { ...init, method: 'GET' }, { timeoutMs })
   },
   post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    const { init, timeoutMs } = splitOptions(options)
     if (isTauri()) {
       return tauriRequest<T>(
         'POST',
         path,
         body !== undefined ? JSON.stringify(body) : undefined,
+        timeoutMs,
       )
     }
-    const { init, timeoutMs } = splitOptions(options)
     const headers = new Headers(init.headers)
     if (body !== undefined && !headers.has('content-type')) {
       headers.set('content-type', 'application/json')
@@ -123,8 +145,8 @@ export const http = {
     )
   },
   delete<T>(path: string, options?: RequestOptions): Promise<T> {
-    if (isTauri()) return tauriRequest<T>('DELETE', path)
     const { init, timeoutMs } = splitOptions(options)
+    if (isTauri()) return tauriRequest<T>('DELETE', path, undefined, timeoutMs)
     return webRequest<T>(path, { ...init, method: 'DELETE' }, { timeoutMs })
   },
 }

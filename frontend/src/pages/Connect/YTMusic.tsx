@@ -43,11 +43,11 @@ export function YTMusicConnect() {
             Para autenticar con YouTube Music necesitas capturar los headers de tu navegador:
           </p>
           <ol className="list-decimal list-inside space-y-1 text-sm text-gray-400">
-            <li>Abre YouTube Music en Chrome o Firefox.</li>
+            <li>Abre <strong>YouTube Music</strong> en Chrome o Firefox.</li>
             <li>Abre las DevTools (F12) y ve a la pestaña <strong>Network</strong>.</li>
             <li>Recarga la página y filtra las peticiones por <code>browse</code>.</li>
-            <li>Haz clic en cualquier petición a <code>browse</code> y copia los headers de la sección <strong>Request Headers</strong>.</li>
-            <li>Pega los headers en el campo de abajo y pulsa «Conectar».</li>
+            <li>Haz clic en cualquier petición a <code>browse</code> y en la sección <strong>Request Headers</strong> copia el bloque entero (incluye <code>x-goog-authuser</code>, <code>cookie</code> y <code>user-agent</code>).</li>
+            <li>Pega los headers aquí y pulsa «Conectar».</li>
           </ol>
           <div className="flex flex-col gap-1">
             <Label htmlFor="ytmusic-headers">Headers del navegador</Label>

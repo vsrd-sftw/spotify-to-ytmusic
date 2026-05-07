@@ -1,6 +1,6 @@
 [package]
 name = "spotify-to-ytmusic"
-version = "0.2.1"
+version = "0.2.2"
 description = "Migrate your Spotify library to YouTube Music"
 authors = ["vsrd-sftw"]
 edition = "2021"
