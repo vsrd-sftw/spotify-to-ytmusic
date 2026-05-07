@@ -1,4 +1,4 @@
-import { getBaseUrl } from './tauri'
+import { getBaseUrl, isTauri } from './tauri'
 
 export class HttpError extends Error {
   readonly status: number
@@ -16,6 +16,24 @@ export const DEFAULT_TIMEOUT_MS = 15_000
 
 export type RequestOptions = Omit<RequestInit, 'body'> & {
   timeoutMs?: number
+}
+
+interface ProxyResponse {
+  status: number
+  body: unknown
+}
+
+async function tauriRequest<T>(method: string, path: string, bodyStr?: string): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  const resp: ProxyResponse = await invoke('proxy_request', {
+    method,
+    path: path.startsWith('/') ? path : `/${path}`,
+    body: bodyStr ?? null,
+  })
+  if (resp.status < 200 || resp.status >= 300) {
+    throw new HttpError(resp.status, resp.body)
+  }
+  return resp.body as T
 }
 
 async function resolveUrl(path: string): Promise<string> {
@@ -44,24 +62,19 @@ async function parseOk<T>(res: Response): Promise<T> {
 function combineSignals(timeoutMs: number, external?: AbortSignal | null): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(timeoutMs)
   if (!external) return timeoutSignal
-  // AbortSignal.any is available in Node 20+ and modern browsers
   if (typeof AbortSignal.any === 'function') {
     return AbortSignal.any([timeoutSignal, external])
   }
   return timeoutSignal
 }
 
-async function request<T>(
+async function webRequest<T>(
   path: string,
   init: RequestInit,
   options: { timeoutMs?: number } = {},
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const signal = timeoutMs > 0 ? combineSignals(timeoutMs, init.signal) : init.signal
-  // Network failures (DNS, offline, MSW HttpResponse.error) surface as TypeError
-  // from fetch — we let them propagate so callers can distinguish them from
-  // HttpError (which always carries a real status). Timeout/abort surface as
-  // a DOMException whose `name` is `TimeoutError` or `AbortError`.
   const res = await fetch(await resolveUrl(path), { ...init, signal })
   if (!res.ok) {
     const body = await readErrorBody(res)
@@ -81,16 +94,24 @@ function splitOptions(options?: RequestOptions): {
 
 export const http = {
   get<T>(path: string, options?: RequestOptions): Promise<T> {
+    if (isTauri()) return tauriRequest<T>('GET', path)
     const { init, timeoutMs } = splitOptions(options)
-    return request<T>(path, { ...init, method: 'GET' }, { timeoutMs })
+    return webRequest<T>(path, { ...init, method: 'GET' }, { timeoutMs })
   },
   post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    if (isTauri()) {
+      return tauriRequest<T>(
+        'POST',
+        path,
+        body !== undefined ? JSON.stringify(body) : undefined,
+      )
+    }
     const { init, timeoutMs } = splitOptions(options)
     const headers = new Headers(init.headers)
     if (body !== undefined && !headers.has('content-type')) {
       headers.set('content-type', 'application/json')
     }
-    return request<T>(
+    return webRequest<T>(
       path,
       {
         ...init,
@@ -102,7 +123,8 @@ export const http = {
     )
   },
   delete<T>(path: string, options?: RequestOptions): Promise<T> {
+    if (isTauri()) return tauriRequest<T>('DELETE', path)
     const { init, timeoutMs } = splitOptions(options)
-    return request<T>(path, { ...init, method: 'DELETE' }, { timeoutMs })
+    return webRequest<T>(path, { ...init, method: 'DELETE' }, { timeoutMs })
   },
 }

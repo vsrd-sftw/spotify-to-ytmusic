@@ -1,12 +1,61 @@
 use std::sync::Mutex;
 
+use serde::Serialize;
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+#[derive(Serialize)]
+struct ProxyResponse {
+    status: u16,
+    body: serde_json::Value,
+}
+
+#[tauri::command]
+fn proxy_request(
+    state: tauri::State<SidecarState>,
+    method: String,
+    path: String,
+    body: Option<String>,
+) -> Result<ProxyResponse, String> {
+    let url = format!("http://127.0.0.1:{}/api{}", state.port, path);
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(10))
+        .timeout_read(std::time::Duration::from_secs(30))
+        .build();
+
+    let mut req = match method.to_uppercase().as_str() {
+        "GET" => agent.get(&url),
+        "POST" => agent.post(&url),
+        "DELETE" => agent.delete(&url),
+        _ => return Err(format!("unsupported method: {}", method)),
+    };
+
+    req = req.set("Content-Type", "application/json");
+
+    let resp = if let Some(b) = body {
+        req.send_string(&b).map_err(|e| format!("request failed: {e}"))?
+    } else {
+        req.call().map_err(|e| format!("request failed: {e}"))?
+    };
+
+    let status = resp.status();
+    let body_str = resp
+        .into_string()
+        .map_err(|e| format!("failed to read response: {e}"))?;
+
+    let body_json: serde_json::Value = if body_str.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_str(&body_str).unwrap_or(serde_json::Value::String(body_str))
+    };
+
+    Ok(ProxyResponse { status, body: body_json })
+}
+
 struct SidecarState {
     port: u16,
-    _child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
 }
 
 #[tauri::command]
@@ -26,14 +75,27 @@ pub fn run() {
                 tauri::async_runtime::block_on(spawn_sidecar(app.handle()))?
             };
 
-            app.manage(SidecarState {
-                port,
-                _child: Mutex::new(None),
-            });
+            if cfg!(debug_assertions) {
+                app.manage(SidecarState {
+                    port,
+                    child: Mutex::new(None),
+                });
+            }
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_server_port])
+        .on_event(|app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                if let Some(state) = app.try_state::<SidecarState>() {
+                    if let Ok(mut child) = state.child.lock() {
+                        if let Some(c) = child.take() {
+                            let _ = c.kill();
+                        }
+                    }
+                }
+            }
+        })
+        .invoke_handler(tauri::generate_handler![get_server_port, proxy_request])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -72,8 +134,9 @@ async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error
         }
     }
 
-    tauri::async_runtime::spawn(async move {
-        let _ = child;
+    app.manage(SidecarState {
+        port,
+        child: Mutex::new(Some(child)),
     });
 
     Ok(port)
