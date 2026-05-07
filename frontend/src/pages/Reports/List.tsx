@@ -27,10 +27,10 @@ function ReportItem({
         <CardBody>
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-gray-100">
                 {report.id ? `Reporte ${report.id.slice(0, 8)}` : 'Reporte sin ID'}
               </span>
-              <div className="flex gap-3 text-xs text-gray-500">
+              <div className="flex gap-3 text-xs text-gray-400">
                 <span>{playlistCount} playlist{playlistCount !== 1 ? 's' : ''}</span>
                 <span>{albumCount} álbum{albumCount !== 1 ? 'es' : ''}</span>
                 {missCount > 0 && (
@@ -38,7 +38,7 @@ function ReportItem({
                 )}
               </div>
             </div>
-            <span className="text-gray-500">→</span>
+            <span className="text-gray-400">→</span>
           </div>
         </CardBody>
       </Card>

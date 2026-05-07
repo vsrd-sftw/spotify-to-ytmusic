@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button, FieldError, Input, Label } from '@/components/ui'
 import { http } from '@/lib/http'
 import { useSpotifyAuth } from '@/features/auth/useSpotifyAuth'
@@ -17,6 +17,16 @@ export function SpotifyConnect() {
   const invalidateHealth = useInvalidateHealth()
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
+  const [callbackError, setCallbackError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const err = params.get('error')
+    if (err) {
+      setCallbackError(decodeURIComponent(err))
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const isConnected = spotify === 'connected'
 
@@ -31,10 +41,16 @@ export function SpotifyConnect() {
     >
       <h2
         id="spotify-connect-heading"
-        className="text-xl font-semibold text-gray-900"
+        className="text-xl font-semibold text-gray-100"
       >
         Conectar Spotify
       </h2>
+
+      {callbackError && (
+        <div className="rounded-md border border-red-700 bg-red-900/30 p-3">
+          <p className="text-sm text-red-300">{callbackError}</p>
+        </div>
+      )}
 
       {isConnected ? (
         <div className="flex flex-col gap-2">
@@ -53,15 +69,15 @@ export function SpotifyConnect() {
       ) : (
         <>
           {configured === false && (
-            <div className="flex flex-col gap-3 rounded-md border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">
+            <div className="flex flex-col gap-3 rounded-md border border-gray-700 p-4">
+              <p className="text-sm text-gray-400">
                 Configura tus credenciales de desarrollador de Spotify. Puedes
                 obtenerlas en el{' '}
                 <a
                   href="https://developer.spotify.com/dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 underline"
+                  className="text-primary-400 underline"
                 >
                   Dashboard de Spotify
                 </a>
@@ -99,7 +115,7 @@ export function SpotifyConnect() {
             </div>
           )}
 
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Inicia sesión con tu cuenta de Spotify para que podamos leer tus
             playlists y álbumes guardados. Serás redirigido a Spotify para
             autorizar el acceso.

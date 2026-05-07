@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useHealth } from '@/features/auth/useHealth';
+import { useMigrationState } from '@/hooks/useMigrationState';
 import { ConnectionStatus } from './ConnectionStatus';
 
 const NAV_ITEMS: { to: string; label: string }[] = [
@@ -11,6 +12,7 @@ const NAV_ITEMS: { to: string; label: string }[] = [
 
 export function Header() {
   const { spotify, ytmusic } = useHealth();
+  const isMigrating = useMigrationState();
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-gray-700 bg-gray-900 px-4 gap-2 sm:gap-4">
@@ -19,13 +21,16 @@ export function Header() {
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
-            to={item.to}
+            to={isMigrating ? '#' : item.to}
+            onClick={(e) => isMigrating && e.preventDefault()}
             className={({ isActive }) =>
               [
                 'px-3 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0',
                 isActive
                   ? 'bg-gray-700 text-gray-100'
-                  : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800',
+                  : isMigrating
+                    ? 'text-gray-600 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800',
               ].join(' ')
             }
           >

@@ -19,7 +19,7 @@ export function YTMusicConnect() {
 
   return (
     <section aria-labelledby="ytmusic-connect-heading" className="flex flex-col gap-4 p-8">
-      <h2 id="ytmusic-connect-heading" className="text-xl font-semibold text-gray-900">
+      <h2 id="ytmusic-connect-heading" className="text-xl font-semibold text-gray-100">
         Conectar YouTube Music
       </h2>
 
@@ -39,10 +39,10 @@ export function YTMusicConnect() {
         </div>
       ) : (
         <>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Para autenticar con YouTube Music necesitas capturar los headers de tu navegador:
           </p>
-          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-400">
             <li>Abre YouTube Music en Chrome o Firefox.</li>
             <li>Abre las DevTools (F12) y ve a la pestaña <strong>Network</strong>.</li>
             <li>Recarga la página y filtra las peticiones por <code>browse</code>.</li>

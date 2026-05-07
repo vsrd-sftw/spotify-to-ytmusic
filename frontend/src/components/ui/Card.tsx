@@ -22,7 +22,7 @@ export interface CardFooterProps {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={['rounded-lg border border-gray-200 bg-white shadow-sm', className].join(' ')}>
+    <div className={['rounded-lg border border-gray-700 bg-gray-800', className].join(' ')}>
       {children}
     </div>
   )
@@ -30,7 +30,7 @@ export function Card({ children, className = '' }: CardProps) {
 
 export function CardHeader({ children, className = '' }: CardHeaderProps) {
   return (
-    <div className={['border-b border-gray-200 px-4 py-3', className].join(' ')}>
+    <div className={['border-b border-gray-700 px-4 py-3', className].join(' ')}>
       {children}
     </div>
   )
@@ -46,7 +46,7 @@ export function CardBody({ children, className = '' }: CardBodyProps) {
 
 export function CardFooter({ children, className = '' }: CardFooterProps) {
   return (
-    <div className={['border-t border-gray-200 px-4 py-3', className].join(' ')}>
+    <div className={['border-t border-gray-700 px-4 py-3', className].join(' ')}>
       {children}
     </div>
   )

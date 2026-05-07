@@ -15,7 +15,7 @@ export function ReportsListPage() {
       <h2
         ref={headingRef}
         tabIndex={-1}
-        className="text-xl font-semibold text-gray-900 outline-none"
+        className="text-xl font-semibold text-gray-100 outline-none"
       >
         Reportes
       </h2>

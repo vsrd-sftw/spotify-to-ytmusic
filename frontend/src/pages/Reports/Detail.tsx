@@ -39,7 +39,7 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
         <h2
           ref={headingRef}
           tabIndex={-1}
-          className="text-lg font-semibold text-gray-900 outline-none"
+          className="text-lg font-semibold text-gray-100 outline-none"
         >
           {resolved.id ? `Reporte ${resolved.id.slice(0, 8)}` : 'Detalle del reporte'}
         </h2>
@@ -48,7 +48,7 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
             <button
               type="button"
               onClick={() => onDownload(resolved)}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="px-3 py-1.5 text-sm font-medium text-gray-300 border border-gray-600 rounded-md hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               Descargar JSON
             </button>
@@ -56,7 +56,7 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="px-3 py-1.5 text-sm font-medium text-gray-300 border border-gray-600 rounded-md hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             Cerrar
           </button>
@@ -81,19 +81,19 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
       {!isLoading && !error && (
         <div className="flex flex-col gap-4">
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+            <h3 className="mb-2 text-sm font-semibold text-gray-300">
               Playlists ({resolved.playlists.length})
             </h3>
             {resolved.playlists.length === 0 ? (
-              <p className="text-sm text-gray-500">No se migraron playlists.</p>
+              <p className="text-sm text-gray-400">No se migraron playlists.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {resolved.playlists.map((pl, idx) => (
                   <Card key={idx}>
                     <CardBody>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-900">{pl.name}</span>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm font-medium text-gray-100">{pl.name}</span>
+                        <span className="text-sm text-gray-400">
                           {pl.found}/{pl.total} encontradas
                         </span>
                       </div>
@@ -105,11 +105,11 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+            <h3 className="mb-2 text-sm font-semibold text-gray-300">
               Álbumes ({resolved.albums.length})
             </h3>
             {resolved.albums.length === 0 ? (
-              <p className="text-sm text-gray-500">No se migraron álbumes.</p>
+              <p className="text-sm text-gray-400">No se migraron álbumes.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {resolved.albums.map((album, idx) => {
@@ -122,7 +122,7 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
                     <Card key={idx}>
                       <CardBody>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">{album.label}</span>
+                          <span className="text-sm font-medium text-gray-100">{album.label}</span>
                           <span className={`text-sm font-medium ${statusColors[album.status]}`}>
                             {album.status}
                           </span>
@@ -136,19 +136,19 @@ export function ReportDetail({ report, onClose, onDownload }: ReportDetailProps)
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+            <h3 className="mb-2 text-sm font-semibold text-gray-300">
               No encontrados ({resolved.notFound.length})
             </h3>
             {resolved.notFound.length === 0 ? (
-              <p className="text-sm text-gray-500">Todos los items fueron encontrados.</p>
+              <p className="text-sm text-gray-400">Todos los items fueron encontrados.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {resolved.notFound.map((item, idx) => (
                   <Card key={idx}>
                     <CardBody>
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-gray-900">{item.item}</span>
-                        <span className="text-xs text-gray-500">{item.context}</span>
+                        <span className="text-sm font-medium text-gray-100">{item.item}</span>
+                        <span className="text-xs text-gray-400">{item.context}</span>
                       </div>
                     </CardBody>
                   </Card>

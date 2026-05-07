@@ -35,7 +35,7 @@ export function LibraryPage() {
         id="library-heading"
         ref={headingRef}
         tabIndex={-1}
-        className="mb-4 text-xl font-semibold text-gray-900 outline-none"
+        className="mb-4 text-xl font-semibold text-gray-100 outline-none"
       >
         Biblioteca
       </h2>

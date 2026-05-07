@@ -6,7 +6,7 @@ export type { ToastProviderProps } from '../../lib/ToastContextValue'
 const typeStyles = {
   success: 'bg-green-50 border-green-200 text-green-800',
   error: 'bg-red-50 border-red-200 text-red-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  info: 'bg-primary-900/20 border-primary-800 text-primary-200',
 }
 
 const icons = {
@@ -35,7 +35,7 @@ interface ToastItemProps {
 function ToastItem({ toast, onDismiss }: ToastItemProps) {
   return (
     <div
-      className={['flex items-center gap-3 rounded-md border p-4 shadow-sm', typeStyles[toast.type]].join(' ')}
+      className={['flex items-center gap-3 rounded-md border p-4', typeStyles[toast.type]].join(' ')}
       role="alert"
     >
       <span className="flex-shrink-0">{icons[toast.type]}</span>

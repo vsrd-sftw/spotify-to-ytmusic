@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<string, string> = {
 function AlbumItem({ album }: { album: AlbumProgressItem }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="truncate text-gray-900">{album.label}</span>
+      <span className="truncate text-gray-100">{album.label}</span>
       <span
         className={[
           'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -52,7 +52,7 @@ export function AlbumProgress({
     <Card>
       <CardBody className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-gray-100">
             Álbumes ({albums.length} / {totalDiscovered})
           </h3>
         </div>
@@ -61,7 +61,7 @@ export function AlbumProgress({
           <span className="text-yellow-700">{foundCount} encontrados</span>
           <span className="text-red-700">{notFoundCount} no encontrados</span>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-700">
           {albums.map((album, index) => (
             <AlbumItem key={`${album.label}-${index}`} album={album} />
           ))}

@@ -21,7 +21,7 @@ export function Skeleton({ variant = 'text', width, height, className = '' }: Sk
   return (
     <div
       data-testid="skeleton"
-      className={['animate-pulse bg-gray-200', variantStyles[variant], className].join(' ')}
+      className={['animate-pulse bg-gray-600', variantStyles[variant], className].join(' ')}
       style={style}
     />
   )

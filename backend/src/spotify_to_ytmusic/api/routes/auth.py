@@ -41,6 +41,11 @@ def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None
 
 @router.post("/auth/spotify")
 async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
+    import os
+    client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        return ErrorResponse(message="Credenciales de Spotify no configuradas. Configúralas primero.")
     state = secrets.token_urlsafe(32)
     redirect_uri = _resolve_redirect_uri(request)
     state_store.set(state, ttl_seconds=300, redirect_uri=redirect_uri)
@@ -64,18 +69,21 @@ def _resolve_redirect_uri(request: Request) -> str:
 
 @router.get("/auth/spotify/callback")
 async def auth_spotify_callback(request: Request, code: str = "", state: str = ""):
+    from urllib.parse import urlencode
+
     stored = state_store.get(state)
     if not stored:
-        return ErrorResponse(message="Estado de autenticación inválido o expirado.")
+        params = urlencode({"error": "Estado de autenticación inválido o expirado."})
+        return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)
     state_store.delete(state)
     redirect_uri = stored.get("redirect_uri")
     oauth = _get_spotify_oauth(redirect_uri=redirect_uri)
     try:
         oauth.get_access_token(code, as_dict=True)
     except Exception as e:
-        return ErrorResponse(message=f"Error al obtener el token de Spotify: {e}")
-    origin = request.headers.get("origin", "http://localhost:5173")
-    return RedirectResponse(url=origin, status_code=302)
+        params = urlencode({"error": f"Error al conectar con Spotify: {e}"})
+        return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)
+    return RedirectResponse(url="http://127.0.0.1:5173", status_code=302)
 
 
 @router.post("/auth/ytmusic")

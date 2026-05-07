@@ -90,7 +90,7 @@ describe('ListItem selection', () => {
       </List>
     )
     const listItems = screen.getAllByRole('listitem')
-    expect(listItems[0]).toHaveClass('bg-blue-50')
-    expect(listItems[1]).not.toHaveClass('bg-blue-50')
+    expect(listItems[0]).toHaveClass('bg-primary-900/30')
+    expect(listItems[1]).not.toHaveClass('bg-primary-900/30')
   })
 })

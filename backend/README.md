@@ -1,6 +1,6 @@
 # backend
 
-Python package, CLI, and (planned) FastAPI server for migrating a Spotify
+Python package, CLI, and FastAPI server for migrating a Spotify
 library to YouTube Music.
 
 ## Requirements
@@ -88,12 +88,22 @@ The server prints the effective URL on startup. Endpoints:
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/health` | Auth status for Spotify and YT Music |
+| `GET` | `/api/auth/spotify/setup` | Whether Spotify credentials are configured |
+| `POST` | `/api/auth/spotify/setup` | Save Spotify credentials (persisted to disk) |
 | `POST` | `/api/auth/spotify` | Returns Spotify OAuth authorize URL |
 | `GET` | `/api/auth/spotify/callback` | OAuth callback, redirects to frontend |
+| `DELETE` | `/api/auth/spotify` | Disconnect Spotify (clears token + creds) |
 | `POST` | `/api/auth/ytmusic` | Saves YT Music browser headers |
+| `DELETE` | `/api/auth/ytmusic` | Disconnect YT Music (clears headers) |
+| `GET` | `/api/playlists` | List playlists |
+| `GET` | `/api/albums` | List saved albums |
+| `POST` | `/api/migrate` | Start migration job |
+| `WS` | `/api/migrate/:jobId/events` | Stream migration events |
+| `GET` | `/api/reports` | List reports |
+| `GET` | `/api/reports/:id` | Single report detail |
 
 All responses are serialized in `camelCase`. CORS is restricted to
-`localhost:5173` (Vite dev) and Tauri origins.
+`localhost:5173`, `127.0.0.1:5173`, and Tauri origins.
 
 ## Usage
 
@@ -194,7 +204,7 @@ core/
 ├── migrator.py        # Orchestrator (no I/O presentation)
 └── report.py          # JSON serialization
 cli/                   # argparse + interactive selector + event-to-print mapping
-api/                   # (planned) FastAPI app
+api/                   # FastAPI app with WebSocket event streaming
 ```
 
 `SpotifyClient` separates discovery from track loading: `list_playlist_summaries()`

@@ -19,7 +19,7 @@ export function Spinner({ size = 'md', className = '', label = 'Loading' }: Spin
       className={['inline-flex items-center justify-center', className].join(' ')}
     >
       <svg
-        className={['animate-spin text-gray-600', sizeStyles[size]].join(' ')}
+        className={['animate-spin text-gray-400', sizeStyles[size]].join(' ')}
         viewBox="0 0 24 24"
         fill="none"
       >

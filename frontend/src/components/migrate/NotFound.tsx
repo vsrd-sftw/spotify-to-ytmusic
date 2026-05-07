@@ -38,7 +38,7 @@ export function NotFound({ labels }: NotFoundProps) {
           {isOpen ? <ChevronDown /> : <ChevronRight />}
         </button>
         {isOpen && (
-          <ul className="mt-2 pl-4 list-disc text-sm text-gray-600">
+          <ul className="mt-2 pl-4 list-disc text-sm text-gray-400">
             {labels.map((label, idx) => (
               <li key={idx}>{label}</li>
             ))}

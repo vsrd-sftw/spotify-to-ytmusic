@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
           role="alert"
           className="flex flex-col items-center justify-center gap-4 p-8 text-center"
         >
-          <p className="text-lg font-medium text-gray-800">Algo salió mal.</p>
+          <p className="text-lg font-medium text-gray-200">Algo salió mal.</p>
           <Button variant="secondary" onClick={this.reset}>
             Reintentar
           </Button>
