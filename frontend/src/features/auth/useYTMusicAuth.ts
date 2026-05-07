@@ -26,10 +26,6 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
         setErrorMessage('Pega los headers del navegador antes de continuar.');
         return;
       }
-      if (!isValidHeaders(headers)) {
-        setErrorMessage('Los headers deben incluir al menos cookie: y user-agent:.');
-        return;
-      }
 
       setState('submitting');
       setErrorMessage(null);

@@ -32,16 +32,7 @@ describe('useYTMusicAuth', () => {
     expect(result.current.errorMessage).toMatch(/headers/i);
   });
 
-  it('shows error and stays idle when headers lack cookie or user-agent', () => {
-    const { result } = renderHook(() => useYTMusicAuth(), { wrapper });
-    act(() => {
-      result.current.connect('authorization: Bearer token');
-    });
-    expect(result.current.state).toBe('idle');
-    expect(result.current.errorMessage).toMatch(/cookie/i);
-  });
-
-  it('reaches success state on valid headers', async () => {
+  it('sets error state on HTTP error', async () => {
     const { result } = renderHook(() => useYTMusicAuth(), { wrapper });
     await act(async () => {
       result.current.connect(VALID_HEADERS);

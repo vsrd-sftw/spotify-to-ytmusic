@@ -57,14 +57,15 @@ describe('YTMusicConnect', () => {
     expect(section).toHaveTextContent(/network/i);
   });
 
-  it('shows FieldError when headers lack required fields', async () => {
+  it('shows FieldError when server rejects headers', async () => {
+    server.use(ytmusicAuthErrorHandler);
     renderComponent();
     fireEvent.change(screen.getByLabelText(/headers del navegador/i), {
       target: { value: 'authorization: Bearer token' },
     });
     fireEvent.click(screen.getByRole('button', { name: /conectar con youtube music/i }));
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/cookie/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(/error al guardar headers/i);
     });
   });
 
