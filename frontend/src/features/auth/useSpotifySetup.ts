@@ -35,15 +35,18 @@ export function useSpotifySetup(): UseSpotifySetupResult {
       })
       .catch((err: unknown) => {
         setState('error')
+        console.error('useSpotifySetup save error:', err)
         if (err instanceof HttpError) {
           const body = err.body as Record<string, unknown> | null
+          console.error('useSpotifySetup save HttpError:', { status: err.status, body })
           setErrorMessage(
             typeof body?.message === 'string'
               ? body.message
               : `Error al guardar credenciales (${err.status})`,
           )
         } else {
-          setErrorMessage('No se pudo guardar. Comprueba tu conexión.')
+          const msg = err instanceof Error ? err.message : String(err)
+          setErrorMessage(`Error de red: ${msg}`)
         }
       })
   }, [])
