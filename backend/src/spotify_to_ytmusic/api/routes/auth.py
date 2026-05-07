@@ -49,13 +49,20 @@ async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
 
 
 def _resolve_redirect_uri(request: Request) -> str:
-    """Return the callback URL that Spotify will redirect to after auth."""
-    import sys
+    """Return the callback URL that Spotify will redirect to after auth.
 
+    Routes the callback through the Vite dev proxy when the request
+    originates from the Vite dev server, because the Tauri webview
+    cannot reach the backend directly.
+    """
     origin = request.headers.get("origin", "")
+    if origin in ("tauri://localhost", "https://tauri.localhost"):
+        return "http://127.0.0.1:53682/api/auth/spotify/callback"
+    if origin and origin.startswith("http://localhost:"):
+        return f"{origin}/api/auth/spotify/callback"
     referer = request.headers.get("referer", "")
-    host = request.headers.get("host", "")
-    print(f"[auth] origin={origin!r} referer={referer!r} host={host!r}", file=sys.stderr, flush=True)
+    if referer.startswith("http://localhost:5173"):
+        return "http://localhost:5173/api/auth/spotify/callback"
     return "http://localhost:5173/api/auth/spotify/callback"
 
 
