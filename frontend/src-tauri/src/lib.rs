@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::Manager;
-use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 #[derive(Serialize)]
@@ -64,12 +64,29 @@ async fn proxy_request(
 
 struct SidecarState {
     port: u16,
-    child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    child: Mutex<Option<CommandChild>>,
 }
 
 #[tauri::command]
 fn get_server_port(state: tauri::State<SidecarState>) -> u16 {
     state.port
+}
+
+fn kill_sidecar(child: &mut Option<CommandChild>) {
+    if let Some(c) = child.take() {
+        eprintln!("[sidecar] killing sidecar process…");
+        if let Err(e) = c.kill() {
+            eprintln!("[sidecar] kill() failed: {e}");
+        } else {
+            eprintln!("[sidecar] kill() sent, waiting for process exit…");
+            match c.wait() {
+                Ok(status) => eprintln!("[sidecar] process exited with {status}"),
+                Err(e) => eprintln!("[sidecar] wait() failed: {e}"),
+            }
+        }
+    } else {
+        eprintln!("[sidecar] no child to kill (already taken or never set)");
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -98,12 +115,12 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                if let Some(state) = app_handle.try_state::<SidecarState>() {
-                    if let Ok(mut child) = state.child.lock() {
-                        if let Some(c) = child.take() {
-                            let _ = c.kill();
-                        }
-                    }
+                match app_handle.try_state::<SidecarState>() {
+                    Some(state) => match state.child.lock() {
+                        Ok(mut child) => kill_sidecar(&mut child),
+                        Err(e) => eprintln!("[sidecar] mutex poisoned, cannot kill sidecar: {e}"),
+                    },
+                    None => eprintln!("[sidecar] SidecarState not found, cannot kill sidecar"),
                 }
             }
         });
@@ -124,24 +141,28 @@ async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error
         .spawn()
         .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
 
-    let port: u16;
-    loop {
+    let port: u16 = loop {
         match rx.recv().await {
             Some(CommandEvent::Stdout(line)) => {
                 let text = String::from_utf8_lossy(&line);
                 if let Some(p) = text.trim().strip_prefix("SERVER_LISTENING port=") {
-                    port = p
-                        .parse()
-                        .map_err(|_| format!("invalid SERVER_LISTENING line: {text}"))?;
-                    break;
+                    match p.parse() {
+                        Ok(port) => break port,
+                        Err(_) => {
+                            eprintln!("[sidecar] invalid SERVER_LISTENING line: {text}");
+                        }
+                    }
                 }
             }
             Some(CommandEvent::Terminated(_)) | None => {
+                eprintln!("[sidecar] sidecar exited prematurely — killing before returning error");
+                let _ = child.kill();
+                let _ = child.wait();
                 return Err("sidecar exited without printing SERVER_LISTENING".into());
             }
             _ => {}
         }
-    }
+    };
 
     app.manage(SidecarState {
         port,

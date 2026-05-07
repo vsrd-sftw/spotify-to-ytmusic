@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicknaming/Tauri-2.0/refs/heads/main/schema/config.schema.json",
   "productName": "Spotify to YT Music",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.spotify-to-ytmusic.app",
   "build": {
     "frontendDist": "../dist",

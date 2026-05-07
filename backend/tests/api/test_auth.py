@@ -86,12 +86,25 @@ async def test_auth_ytmusic_valid_headers(client, tmp_path):
          patch("ytmusicapi.auth.browser.setup_browser") as mock_setup:
         resp = await client.post(
             "/api/auth/ytmusic",
-            json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0"},
+            json={
+                "headers": "cookie: ABC\nuser-agent: Mozilla/5.0\nx-goog-authuser: 1"
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is True
         mock_setup.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_auth_ytmusic_missing_x_goog_authuser(client):
+    resp = await client.post(
+        "/api/auth/ytmusic",
+        json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "x-goog-authuser" in data["message"].lower()
 
 
 @pytest.mark.asyncio
