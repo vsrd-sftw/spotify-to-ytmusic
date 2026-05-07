@@ -9,6 +9,13 @@ ALLOWED_ORIGINS = [
     "https://tauri.localhost",
 ]
 
+import re
+
+ALLOWED_ORIGIN_REGEX = re.compile(
+    r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+)
+
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="spotify-to-ytmusic API")
@@ -16,6 +23,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
+        allow_origin_regex=ALLOWED_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
