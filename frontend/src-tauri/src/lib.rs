@@ -78,11 +78,7 @@ fn kill_sidecar(child: &mut Option<CommandChild>) {
         if let Err(e) = c.kill() {
             eprintln!("[sidecar] kill() failed: {e}");
         } else {
-            eprintln!("[sidecar] kill() sent, waiting for process exit…");
-            match c.wait() {
-                Ok(status) => eprintln!("[sidecar] process exited with {status}"),
-                Err(e) => eprintln!("[sidecar] wait() failed: {e}"),
-            }
+            eprintln!("[sidecar] kill() succeeded");
         }
     } else {
         eprintln!("[sidecar] no child to kill (already taken or never set)");
@@ -157,7 +153,6 @@ async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error
             Some(CommandEvent::Terminated(_)) | None => {
                 eprintln!("[sidecar] sidecar exited prematurely — killing before returning error");
                 let _ = child.kill();
-                let _ = child.wait();
                 return Err("sidecar exited without printing SERVER_LISTENING".into());
             }
             _ => {}

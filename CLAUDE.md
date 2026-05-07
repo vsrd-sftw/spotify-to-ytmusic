@@ -125,9 +125,9 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   unwritable). Credentials, cache, and reports are stored here.
 - **Sidecar cleanup on exit.** The `child` process handle is stored in
   `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback
-  with `eprintln!` logging at every failure point. `kill()` is followed
-  by `wait()` to ensure the process has exited before Tauri terminates.
-  Don't spawn the child without storing a reference to kill it.
+  with `eprintln!` logging at every failure point. `kill()` calls
+  `TerminateProcess` on Windows. Don't spawn the child without storing
+  a reference to kill it.
 - **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
   (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
   subdirectory). The script copies it to `binaries/spotify-to-ytmusic-server-{target-triple}.exe`.
