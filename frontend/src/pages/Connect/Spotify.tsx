@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button, FieldError, Input, Label } from '@/components/ui'
 import { http } from '@/lib/http'
 import { useSpotifyAuth } from '@/features/auth/useSpotifyAuth'
@@ -17,6 +17,16 @@ export function SpotifyConnect() {
   const invalidateHealth = useInvalidateHealth()
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
+  const [callbackError, setCallbackError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const err = params.get('error')
+    if (err) {
+      setCallbackError(decodeURIComponent(err))
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const isConnected = spotify === 'connected'
 
@@ -35,6 +45,12 @@ export function SpotifyConnect() {
       >
         Conectar Spotify
       </h2>
+
+      {callbackError && (
+        <div className="rounded-md border border-red-700 bg-red-900/30 p-3">
+          <p className="text-sm text-red-300">{callbackError}</p>
+        </div>
+      )}
 
       {isConnected ? (
         <div className="flex flex-col gap-2">
