@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button, FieldError, Label, Textarea } from '@/components/ui';
+import { http } from '@/lib/http';
 import { useYTMusicAuth } from '@/features/auth/useYTMusicAuth';
 import { useHealth } from '@/features/auth/useHealth';
+import { useInvalidateHealth } from '@/features/auth/useHealth';
 
 export function YTMusicConnect() {
   const [headers, setHeaders] = useState('');
   const { state, errorMessage, connect } = useYTMusicAuth();
   const { ytmusic } = useHealth();
+  const invalidateHealth = useInvalidateHealth();
 
   const isConnected = ytmusic === 'connected';
+
+  const disconnect = useCallback(() => {
+    http.delete('/auth/ytmusic').then(() => invalidateHealth());
+  }, [invalidateHealth]);
 
   return (
     <section aria-labelledby="ytmusic-connect-heading" className="flex flex-col gap-4 p-8">
@@ -17,12 +24,19 @@ export function YTMusicConnect() {
       </h2>
 
       {isConnected ? (
-        <p className="flex items-center gap-2 text-sm font-medium text-green-700">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 text-xs">
-            ✓
-          </span>
-          Conectado a YouTube Music
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-2 text-sm font-medium text-green-700">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 text-xs">
+              ✓
+            </span>
+            Conectado a YouTube Music
+          </p>
+          <div>
+            <Button onClick={disconnect} className="bg-red-600 hover:bg-red-700">
+              Desconectar
+            </Button>
+          </div>
+        </div>
       ) : (
         <>
           <p className="text-sm text-gray-600">

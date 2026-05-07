@@ -1,4 +1,5 @@
-import { Button, EmptyState, List, ListItem, ListItemTrailing, Skeleton } from '@/components/ui';
+import { useState } from 'react';
+import { Button, EmptyState, Input, List, ListItem, ListItemTrailing, Skeleton } from '@/components/ui';
 import { useAlbums } from '@/features/library/useAlbums';
 
 function AlbumSkeletons() {
@@ -20,13 +21,14 @@ export interface AlbumsProps {
 
 export function Albums({ selectedIds = new Set(), onToggle, onToggleAll, selectionState = 'none' }: AlbumsProps) {
   const { data, isLoading, isError, refetch } = useAlbums();
+  const [search, setSearch] = useState('');
 
   if (isLoading) return <AlbumSkeletons />;
 
   if (isError) {
     return (
       <div className="flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm text-red-600">No se pudieron cargar los álbumes.</p>
+        <p className="text-sm text-red-400">No se pudieron cargar los álbumes.</p>
         <Button onClick={() => refetch()}>Reintentar</Button>
       </div>
     );
@@ -41,10 +43,22 @@ export function Albums({ selectedIds = new Set(), onToggle, onToggleAll, selecti
     );
   }
 
+  const lower = search.toLowerCase();
+  const filtered = search
+    ? data.filter((a) => a.name.toLowerCase().includes(lower) || a.artist.toLowerCase().includes(lower))
+    : data;
+
   return (
     <div>
+      <div className="px-3 py-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar álbumes..."
+        />
+      </div>
       {onToggleAll && (
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-gray-800">
           <input
             type="checkbox"
             aria-label="Seleccionar todos los álbumes"
@@ -53,31 +67,35 @@ export function Albums({ selectedIds = new Set(), onToggle, onToggleAll, selecti
               if (el) el.indeterminate = selectionState === 'some';
             }}
             onChange={onToggleAll}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            className="h-4 w-4 rounded border-gray-500 text-primary-600"
           />
-          <span className="text-xs text-gray-500">Seleccionar todos</span>
+          <span className="text-xs text-gray-400">Seleccionar todos</span>
         </div>
       )}
-      <List selectedIds={[...selectedIds]} onSelect={onToggle}>
-        {data.map((album) => (
-          <ListItem key={album.spotifyId} id={album.spotifyId}>
-            {onToggle && (
-              <input
-                type="checkbox"
-                aria-label={`Seleccionar ${album.name}`}
-                checked={selectedIds.has(album.spotifyId)}
-                onChange={() => onToggle(album.spotifyId)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-            <span className="flex-1 text-sm font-medium text-gray-900">{album.name}</span>
-            <ListItemTrailing>
-              <span className="text-xs text-gray-500">{album.artist}</span>
-            </ListItemTrailing>
-          </ListItem>
-        ))}
-      </List>
+      {filtered.length === 0 ? (
+        <p className="p-4 text-sm text-gray-400">Sin resultados.</p>
+      ) : (
+        <List selectedIds={[...selectedIds]} onSelect={onToggle}>
+          {filtered.map((album) => (
+            <ListItem key={album.spotifyId} id={album.spotifyId}>
+              {onToggle && (
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${album.name}`}
+                  checked={selectedIds.has(album.spotifyId)}
+                  onChange={() => onToggle(album.spotifyId)}
+                  className="h-4 w-4 rounded border-gray-500 text-primary-600"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+              <span className="flex-1 text-sm font-medium text-gray-200">{album.name}</span>
+              <ListItemTrailing>
+                <span className="text-xs text-gray-400">{album.artist}</span>
+              </ListItemTrailing>
+            </ListItem>
+          ))}
+        </List>
+      )}
     </div>
   );
 }

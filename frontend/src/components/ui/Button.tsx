@@ -8,9 +8,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-600',
-  secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-400',
+  primary: 'bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-600',
+  secondary: 'bg-gray-700 text-gray-200 hover:bg-gray-600 focus-visible:ring-gray-400',
+  ghost: 'bg-transparent text-gray-300 hover:bg-gray-800 focus-visible:ring-gray-400',
 }
 
 const sizeStyles = {

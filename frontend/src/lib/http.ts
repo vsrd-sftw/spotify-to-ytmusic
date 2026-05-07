@@ -101,4 +101,8 @@ export const http = {
       { timeoutMs },
     )
   },
+  delete<T>(path: string, options?: RequestOptions): Promise<T> {
+    const { init, timeoutMs } = splitOptions(options)
+    return request<T>(path, { ...init, method: 'DELETE' }, { timeoutMs })
+  },
 }

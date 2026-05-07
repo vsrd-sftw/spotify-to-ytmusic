@@ -98,6 +98,24 @@ async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
     return OkResponse(ok=True)
 
 
+@router.delete("/auth/ytmusic")
+async def disconnect_ytmusic() -> OkResponse:
+    import os
+    if os.path.isfile(BROWSER_AUTH_FILE):
+        os.remove(BROWSER_AUTH_FILE)
+    return OkResponse(ok=True)
+
+
+@router.delete("/auth/spotify")
+async def disconnect_spotify() -> OkResponse:
+    import os
+    if os.path.isfile(SPOTIFY_TOKEN_CACHE_FILE):
+        os.remove(SPOTIFY_TOKEN_CACHE_FILE)
+    if os.path.isfile(SPOTIFY_CREDENTIALS_FILE):
+        os.remove(SPOTIFY_CREDENTIALS_FILE)
+    return OkResponse(ok=True)
+
+
 # ---- Spotify credentials persistence (desktop app) ----
 
 import json

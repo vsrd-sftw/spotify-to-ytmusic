@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Button, FieldError, Input, Label } from '@/components/ui'
+import { http } from '@/lib/http'
 import { useSpotifyAuth } from '@/features/auth/useSpotifyAuth'
 import { useSpotifySetup } from '@/features/auth/useSpotifySetup'
-import { useHealth } from '@/features/auth/useHealth'
+import { useHealth, useInvalidateHealth } from '@/features/auth/useHealth'
 
 export function SpotifyConnect() {
   const { state, errorMessage, connect } = useSpotifyAuth()
@@ -13,10 +14,15 @@ export function SpotifyConnect() {
     save,
   } = useSpotifySetup()
   const { spotify } = useHealth()
+  const invalidateHealth = useInvalidateHealth()
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
 
   const isConnected = spotify === 'connected'
+
+  const disconnect = useCallback(() => {
+    http.delete('/auth/spotify').then(() => invalidateHealth());
+  }, [invalidateHealth]);
 
   return (
     <section
@@ -31,12 +37,19 @@ export function SpotifyConnect() {
       </h2>
 
       {isConnected ? (
-        <p className="flex items-center gap-2 text-sm font-medium text-green-700">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 text-xs">
-            ✓
-          </span>
-          Conectado a Spotify
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-2 text-sm font-medium text-green-700">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 text-xs">
+              ✓
+            </span>
+            Conectado a Spotify
+          </p>
+          <div>
+            <Button onClick={disconnect} className="bg-red-600 hover:bg-red-700">
+              Desconectar
+            </Button>
+          </div>
+        </div>
       ) : (
         <>
           {configured === false && (
