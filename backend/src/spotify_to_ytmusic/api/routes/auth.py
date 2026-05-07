@@ -79,7 +79,7 @@ async def auth_spotify_callback(request: Request, code: str = "", state: str = "
     redirect_uri = stored.get("redirect_uri")
     oauth = _get_spotify_oauth(redirect_uri=redirect_uri)
     try:
-        oauth.get_access_token(code, as_dict=True)
+        oauth.get_access_token(code, as_dict=True, check_cache=False)
     except Exception as e:
         params = urlencode({"error": f"Error al conectar con Spotify: {e}"})
         return RedirectResponse(url=f"http://127.0.0.1:5173?{params}", status_code=302)

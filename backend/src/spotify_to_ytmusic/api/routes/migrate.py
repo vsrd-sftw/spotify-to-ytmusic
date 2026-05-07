@@ -11,7 +11,6 @@ from spotify_to_ytmusic.api.models import ErrorResponse, MigrateRequest, Migrate
 from spotify_to_ytmusic.api.serialization import serialize_event
 from spotify_to_ytmusic.core.config import (
     BROWSER_AUTH_FILE,
-    DEFAULT_SPOTIFY_REDIRECT_URI,
     SPOTIFY_TOKEN_CACHE_FILE,
     TRACK_CACHE_FILE,
 )
@@ -41,7 +40,7 @@ def _run_migration(
     spotify = SpotifyClient(
         client_id=os.getenv("SPOTIFY_CLIENT_ID", ""),
         client_secret=os.getenv("SPOTIFY_CLIENT_SECRET", ""),
-        redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_SPOTIFY_REDIRECT_URI),
+        redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:5173/api/auth/spotify/callback"),
         open_browser=False,
     )
     ytmusic = YTMusicClient(BROWSER_AUTH_FILE)
