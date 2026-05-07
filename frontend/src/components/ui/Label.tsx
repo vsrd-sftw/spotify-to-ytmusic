@@ -11,7 +11,7 @@ export function Label({ children, id: propsId, className = '', ...props }: Label
   return (
     <label
       htmlFor={id}
-      className={['text-sm font-medium text-gray-700', className].join(' ')}
+      className={['text-sm font-medium text-gray-300', className].join(' ')}
       {...props}
     >
       {children}

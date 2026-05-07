@@ -1,4 +1,5 @@
-import { Button, EmptyState, List, ListItem, ListItemTrailing, Skeleton } from '@/components/ui';
+import { useState } from 'react';
+import { Button, EmptyState, Input, List, ListItem, ListItemTrailing, Skeleton } from '@/components/ui';
 import { usePlaylists } from '@/features/library/usePlaylists';
 import type { SelectionState } from '@/features/library/useSelection';
 
@@ -26,13 +27,14 @@ export function Playlists({
   selectionState = 'none',
 }: PlaylistsProps) {
   const { data, isLoading, isError, refetch } = usePlaylists();
+  const [search, setSearch] = useState('');
 
   if (isLoading) return <PlaylistSkeletons />;
 
   if (isError) {
     return (
       <div className="flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm text-red-600">No se pudieron cargar las playlists.</p>
+        <p className="text-sm text-red-400">No se pudieron cargar las playlists.</p>
         <Button onClick={() => refetch()}>Reintentar</Button>
       </div>
     );
@@ -47,10 +49,22 @@ export function Playlists({
     );
   }
 
+  const lower = search.toLowerCase();
+  const filtered = search
+    ? data.filter((p) => p.name.toLowerCase().includes(lower))
+    : data;
+
   return (
     <div>
+      <div className="px-3 py-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar playlists..."
+        />
+      </div>
       {onToggleAll && (
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-gray-800">
           <input
             type="checkbox"
             aria-label="Seleccionar todas las playlists"
@@ -59,31 +73,35 @@ export function Playlists({
               if (el) el.indeterminate = selectionState === 'some';
             }}
             onChange={onToggleAll}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            className="h-4 w-4 rounded border-gray-500 text-primary-600"
           />
-          <span className="text-xs text-gray-500">Seleccionar todas</span>
+          <span className="text-xs text-gray-400">Seleccionar todas</span>
         </div>
       )}
-      <List selectedIds={[...selectedIds]} onSelect={onToggle}>
-        {data.map((playlist) => (
-          <ListItem key={playlist.id} id={playlist.id}>
-            {onToggle && (
-              <input
-                type="checkbox"
-                aria-label={`Seleccionar ${playlist.name}`}
-                checked={selectedIds.has(playlist.id)}
-                onChange={() => onToggle(playlist.id)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-            <span className="flex-1 text-sm font-medium text-gray-900">{playlist.name}</span>
-            <ListItemTrailing>
-              <span className="text-xs text-gray-500">{playlist.trackCount} canciones</span>
-            </ListItemTrailing>
-          </ListItem>
-        ))}
-      </List>
+      {filtered.length === 0 ? (
+        <p className="p-4 text-sm text-gray-400">Sin resultados.</p>
+      ) : (
+        <List selectedIds={[...selectedIds]} onSelect={onToggle}>
+          {filtered.map((playlist) => (
+            <ListItem key={playlist.id} id={playlist.id}>
+              {onToggle && (
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${playlist.name}`}
+                  checked={selectedIds.has(playlist.id)}
+                  onChange={() => onToggle(playlist.id)}
+                  className="h-4 w-4 rounded border-gray-500 text-primary-600"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+              <span className="flex-1 text-sm font-medium text-gray-200">{playlist.name}</span>
+              <ListItemTrailing>
+                <span className="text-xs text-gray-400">{playlist.trackCount} canciones</span>
+              </ListItemTrailing>
+            </ListItem>
+          ))}
+        </List>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 """Entrypoint: python -m spotify_to_ytmusic.api.server"""
+import logging
 import sys
 
 from dotenv import load_dotenv
@@ -8,6 +9,8 @@ load_dotenv()
 from spotify_to_ytmusic.api.routes.auth import load_persisted_credentials
 
 load_persisted_credentials()
+
+logging.getLogger("spotipy.client").setLevel(logging.CRITICAL)
 
 import uvicorn
 
