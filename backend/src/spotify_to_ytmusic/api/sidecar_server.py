@@ -3,6 +3,7 @@
 Reads the port from argv[1] (0 = random), starts uvicorn, and prints
 ``SERVER_LISTENING port=<n>`` to stdout so the Tauri host can discover it.
 """
+import logging
 import os
 import socket
 import sys
@@ -14,6 +15,8 @@ load_dotenv()
 from spotify_to_ytmusic.api.routes.auth import load_persisted_credentials
 
 load_persisted_credentials()
+
+logging.getLogger("spotipy.client").setLevel(logging.CRITICAL)
 
 import uvicorn
 
