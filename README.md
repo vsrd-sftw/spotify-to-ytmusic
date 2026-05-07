@@ -15,15 +15,17 @@ This is a monorepo:
 
 ## Status
 
-- **Working today:** the CLI (`python backend/main.py …`) does the full
-  Spotify → YouTube Music migration end-to-end and writes a JSON report.
-- **Working in dev mode:** `pnpm dev` boots the frontend. When the FastAPI
-  backend is running (`python -m spotify_to_ytmusic.api.server`), the Vite
-  proxy connects the frontend to real API endpoints. Without the backend,
-  MSW mocks every `/api/*` call.
-- **Desktop app:** Tauri 2 scaffold + PyInstaller sidecar are in place
-  (issues #72–#74). Run `cd frontend && pnpm tauri dev` for development,
-  `pnpm tauri build` for production bundles.
+- **CLI:** full Spotify → YouTube Music migration end-to-end with JSON
+  reports (`python backend/main.py …`).
+- **API + web UI:** the FastAPI server (`python -m spotify_to_ytmusic.api.server`)
+  and the React frontend (`pnpm dev`) are fully functional. Connect your
+  Spotify account, browse your library, select what to migrate, run a
+  migration with live WebSocket progress, and browse or delete reports.
+- **Desktop app:** the Tauri 2 wrapper is fully functional. Run
+  `cd frontend && pnpm tauri dev` for development mode (requires the
+  FastAPI server on :8000), or build a standalone installer with
+  `pnpm tauri build`. See [PACKAGING.md](PACKAGING.md) for the full
+  production build pipeline.
 
 ## Features
 
@@ -42,7 +44,7 @@ This is a monorepo:
 ## Quick start
 
 ```bash
-git clone https://github.com/your-username/spotify-to-ytmusic.git
+git clone https://github.com/vsrd-sftw/spotify-to-ytmusic.git
 cd spotify-to-ytmusic/backend
 
 # Install the package (editable install picks up local changes)
@@ -155,15 +157,41 @@ spotify-to-ytmusic/
 
 A Tauri 2 wrapper bundles the frontend and backend into a native desktop
 application. The Python backend is compiled to a standalone binary via
-PyInstaller and spawned as a sidecar.
+PyInstaller and spawned as a sidecar — no Python installation required.
+
+### Dev mode
 
 ```bash
-# Development
 cd frontend && pnpm tauri dev
-
-# Production build (outputs .msi / .deb / .AppImage)
-cd frontend && pnpm tauri build
 ```
+
+Requires the FastAPI server running on `:8000` (`python -m spotify_to_ytmusic.api.server`).
+
+### Creating a standalone executable
+
+To produce a `.msi`/`.exe` (Windows) or `.deb`/`.AppImage` (Linux)
+installer that users can run without any dev tools:
+
+1. **Build the sidecar** (the Python backend as a standalone binary):
+
+   ```bash
+   pip install -e backend/.[api] pyinstaller>=6
+   python backend/scripts/build_sidecar.py
+   ```
+
+   The binary lands in `frontend/src-tauri/binaries/`.
+
+2. **Build the Tauri bundle:**
+
+   ```bash
+   cd frontend
+   pnpm tauri build
+   ```
+
+   Outputs the installer in `frontend/src-tauri/target/release/bundle/`.
+
+Full CI/CD pipeline and release workflow details are in
+[PACKAGING.md](PACKAGING.md).
 
 ### Data persistence
 

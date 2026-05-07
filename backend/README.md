@@ -17,7 +17,7 @@ pip install -e .
 ```
 
 This installs the `spotify_to_ytmusic` package in editable mode and registers
-a `spotify-to-ytmusic` console script. For the (planned) FastAPI server:
+a `spotify-to-ytmusic` console script. For the FastAPI server:
 
 ```bash
 pip install -e ".[api]"
@@ -101,6 +101,7 @@ The server prints the effective URL on startup. Endpoints:
 | `WS` | `/api/migrate/:jobId/events` | Stream migration events |
 | `GET` | `/api/reports` | List reports |
 | `GET` | `/api/reports/:id` | Single report detail |
+| `DELETE` | `/api/reports/:id` | Delete a report |
 
 All responses are serialized in `camelCase`. CORS is restricted to
 `localhost:5173`, `127.0.0.1:5173`, and Tauri origins.

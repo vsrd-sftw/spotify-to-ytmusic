@@ -111,7 +111,7 @@ src/
 │   ├── auth/             # useSpotifyAuth, useYTMusicAuth, useHealth
 │   ├── library/          # usePlaylists, useAlbums, useSelection (delega en SelectionContext)
 │   ├── migrate/          # useStartMigration, useMigrationSelection, derivaciones del log
-│   └── reports/          # useReports, useReport
+│   └── reports/          # useReports, useReport, useDeleteReport
 ├── contexts/             # SelectionContext (lookup de selección entre páginas)
 ├── hooks/
 │   ├── useMigrationEvents.ts    # WS + reducer incremental
@@ -181,6 +181,7 @@ Los handlers están en
 | `WS` | `/api/migrate/{jobId}/events` | `useMigrationEvents` (eventos tipados → reducer) |
 | `GET` | `/api/reports` | `useReports` |
 | `GET` | `/api/reports/:id` | `useReport` |
+| `DELETE` | `/api/reports/:id` | `useDeleteReport` |
 
 Los tipos del backend se generan desde `/openapi.json` en
 [`src/types/api.gen.ts`](src/types/api.gen.ts) via `pnpm gen:api`.
@@ -193,7 +194,7 @@ mantiene a mano sólo los tipos de eventos WS.
 pnpm test:run
 ```
 
-258+ tests en este momento (suite completa frontend). Los tests de hooks
+264+ tests en este momento (suite completa frontend). Los tests de hooks
 con WebSocket usan un mock `MockWebSocket` definido en cada archivo —
 mira `useMigrationEvents.test.tsx` como referencia.
 
