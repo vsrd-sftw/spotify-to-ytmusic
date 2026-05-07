@@ -93,12 +93,18 @@ def _callback_html(title: str, message: str) -> str:
 <head><meta charset="UTF-8"><title>{title}</title>
 <style>
   body {{ font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #111; color: #e0e0e0; }}
-  .box {{ text-align: center; padding: 2rem; }}
-  h1 {{ font-size: 1.5rem; }}
-  p {{ color: #999; }}
+  .box {{ text-align: center; padding: 2rem; max-width: 420px; }}
+  h1 {{ font-size: 1.5rem; margin-bottom: 0.75rem; }}
+  p {{ color: #999; margin-bottom: 1.5rem; }}
+  button {{ background: #7c3aed; color: #fff; border: none; padding: 0.625rem 1.25rem; border-radius: 0.5rem; font-size: 0.9375rem; cursor: pointer; }}
+  button:hover {{ background: #6d28d9; }}
 </style>
 </head>
-<body><div class="box"><h1>{title}</h1><p>{message}</p></div></body>
+<body><div class="box"><h1>{title}</h1><p>{message}</p>
+<button onclick="window.close()">Cerrar esta pestaña</button>
+</div>
+<script>try {{ window.close() }} catch (_) {{ /* best-effort */ }}</script>
+</body>
 </html>"""
 
 

@@ -59,13 +59,13 @@ async def test_auth_spotify_stores_state(client, monkeypatch):
 @pytest.mark.asyncio
 async def test_auth_spotify_callback_invalid_state(client):
     resp = await client.get("/api/auth/spotify/callback", params={"code": "abc", "state": "nonexistent"})
-    assert resp.status_code == 302
-    assert "error" in resp.headers["location"]
+    assert resp.status_code == 400
+    assert "Estado de autenticación" in resp.text
 
 
 @pytest.mark.asyncio
 async def test_auth_spotify_callback_valid_state(client):
-    state_store.set("valid-state", ttl_seconds=600)
+    state_store.set("valid-state", ttl_seconds=600, redirect_uri="http://127.0.0.1:8000/api/auth/spotify/callback")
     with patch("spotify_to_ytmusic.api.routes.auth._get_spotify_oauth") as mock_oauth:
         oauth = MagicMock()
         mock_oauth.return_value = oauth
@@ -74,9 +74,9 @@ async def test_auth_spotify_callback_valid_state(client):
             "/api/auth/spotify/callback",
             params={"code": "abc", "state": "valid-state"},
         )
-        assert resp.status_code == 302
-        assert resp.headers["location"] == "http://127.0.0.1:5173"
-        oauth.get_access_token.assert_called_once()
+        assert resp.status_code == 200
+        assert "Conectado" in resp.text
+        oauth.get_access_token.assert_called_once_with("abc", as_dict=True, check_cache=False)
 
 
 @pytest.mark.asyncio

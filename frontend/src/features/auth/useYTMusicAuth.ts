@@ -28,7 +28,7 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
       setErrorMessage(null);
 
       http
-        .post('/auth/ytmusic', { headers })
+        .post('/auth/ytmusic', { headers }, { timeoutMs: 30_000 })
         .then(() => {
           setState('success');
           invalidateHealth();
