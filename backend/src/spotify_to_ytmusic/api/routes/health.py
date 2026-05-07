@@ -17,18 +17,12 @@ def _check_spotify() -> bool:
     if not cache.exists():
         return False
     try:
-        from spotipy.oauth2 import SpotifyOAuth
-        from spotify_to_ytmusic.core.config import SPOTIFY_SCOPES
+        import json
+        import time
 
-        oauth = SpotifyOAuth(
-            client_id="",
-            client_secret="",
-            redirect_uri="",
-            scope=SPOTIFY_SCOPES,
-            cache_path=SPOTIFY_TOKEN_CACHE_FILE,
-        )
-        token_info = oauth.get_cached_token()
-        return token_info is not None
+        data = json.loads(cache.read_text())
+        expires_at = data.get("expires_at", 0)
+        return time.time() < expires_at
     except Exception:
         return False
 
