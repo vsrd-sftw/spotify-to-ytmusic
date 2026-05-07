@@ -64,6 +64,10 @@ def _resolve_redirect_uri(request: Request) -> str:
         return "http://127.0.0.1:53682/api/auth/spotify/callback"
     if origin and origin.startswith("http://localhost:"):
         return f"{origin}/api/auth/spotify/callback"
+    # Same-origin request (no Origin header) or referer from Vite dev.
+    referer = request.headers.get("referer", "")
+    if referer.startswith("http://localhost:5173"):
+        return "http://localhost:5173/api/auth/spotify/callback"
     return "http://127.0.0.1:8000/api/auth/spotify/callback"
 
 
