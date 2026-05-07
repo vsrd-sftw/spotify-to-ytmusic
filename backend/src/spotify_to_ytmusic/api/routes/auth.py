@@ -49,26 +49,14 @@ async def auth_spotify(request: Request) -> AuthUrlResponse | ErrorResponse:
 
 
 def _resolve_redirect_uri(request: Request) -> str:
-    """Return the callback URL that Spotify will redirect to after auth.
+    """Return the callback URL that Spotify will redirect to after auth."""
+    import sys
 
-    For the Vite dev server the callback must go through Vite's proxy
-    (``http://localhost:5173/api/auth/spotify/callback``) because the
-    Tauri webview cannot reach ``127.0.0.1:8000`` directly.
-
-    For Tauri production origins a fixed port is used (the sidecar spins
-    up a mini-listener there).  Strategy B (tauri:// deep link) is the
-    long-term plan documented in docs/oauth-desktop.md.
-    """
     origin = request.headers.get("origin", "")
-    if origin in ("tauri://localhost", "https://tauri.localhost"):
-        return "http://127.0.0.1:53682/api/auth/spotify/callback"
-    if origin and origin.startswith("http://localhost:"):
-        return f"{origin}/api/auth/spotify/callback"
-    # Same-origin request (no Origin header) or referer from Vite dev.
     referer = request.headers.get("referer", "")
-    if referer.startswith("http://localhost:5173"):
-        return "http://localhost:5173/api/auth/spotify/callback"
-    return "http://127.0.0.1:8000/api/auth/spotify/callback"
+    host = request.headers.get("host", "")
+    print(f"[auth] origin={origin!r} referer={referer!r} host={host!r}", file=sys.stderr, flush=True)
+    return "http://localhost:5173/api/auth/spotify/callback"
 
 
 @router.get("/auth/spotify/callback")
