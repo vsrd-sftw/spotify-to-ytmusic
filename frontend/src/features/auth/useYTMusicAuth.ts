@@ -11,11 +11,6 @@ export interface UseYTMusicAuthResult {
   connect: (headers: string) => void;
 }
 
-function isValidHeaders(headers: string): boolean {
-  const lower = headers.toLowerCase();
-  return lower.includes('cookie:') && lower.includes('user-agent:');
-}
-
 export function useYTMusicAuth(): UseYTMusicAuthResult {
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,7 +48,7 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
           }
         });
     },
-    [toast],
+    [toast, invalidateHealth],
   );
 
   return { state, errorMessage, connect };

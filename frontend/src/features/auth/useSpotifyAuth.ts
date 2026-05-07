@@ -42,7 +42,7 @@ export function useSpotifyAuth(): UseSpotifyAuthResult {
           setErrorMessage('No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.');
         }
       });
-  }, []);
+  }, [invalidateHealth, toast]);
 
   return { state, errorMessage, connect };
 }
