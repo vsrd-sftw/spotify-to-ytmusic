@@ -7,6 +7,8 @@ import logging
 import os
 import socket
 import sys
+import threading
+import time
 
 from dotenv import load_dotenv
 
@@ -19,6 +21,52 @@ load_persisted_credentials()
 logging.getLogger("spotipy.client").setLevel(logging.CRITICAL)
 
 import uvicorn
+
+# Parent-watchdog tunables. Defense in depth for #98: if the Tauri host
+# crashes or fails to fire its cleanup hooks, the sidecar self-terminates
+# within at most _PARENT_POLL_S of the parent's death.
+_PARENT_POLL_S = 2.0
+
+
+def _is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        # On Windows, EPERM means the process exists but we can't signal it.
+        # On POSIX, EPERM means the same. Either way: alive.
+        return True
+    return True
+
+
+def start_parent_watchdog(
+    parent_pid: int,
+    *,
+    poll_interval_s: float = _PARENT_POLL_S,
+    on_parent_death=None,
+) -> threading.Thread | None:
+    """Spawn a daemon thread that exits the process when ``parent_pid`` dies.
+
+    Returns ``None`` (and does nothing) when the parent PID is not a real
+    parent — eg. running under the CLI, where ``getppid()`` returns the
+    shell. ``on_parent_death`` is injectable for unit tests; it defaults
+    to ``os._exit(0)``.
+    """
+    if parent_pid <= 1:
+        return None
+    callback = on_parent_death or (lambda: os._exit(0))
+
+    def _watch() -> None:
+        while True:
+            if not _is_alive(parent_pid):
+                callback()
+                return
+            time.sleep(poll_interval_s)
+
+    thread = threading.Thread(target=_watch, name="parent-watchdog", daemon=True)
+    thread.start()
+    return thread
 
 
 def _find_free_port() -> int:
@@ -56,6 +104,8 @@ def main() -> None:
 
     config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
+
+    start_parent_watchdog(os.getppid())
 
     print(f"SERVER_LISTENING port={port}", flush=True)
     server.run()
