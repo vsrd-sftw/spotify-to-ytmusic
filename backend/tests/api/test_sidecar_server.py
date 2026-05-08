@@ -13,6 +13,12 @@ from spotify_to_ytmusic.api.sidecar_server import (
     start_parent_watchdog,
 )
 
+# Capture the real sleep/monotonic before the autouse `_no_sleep` fixture
+# in conftest replaces time.sleep with a no-op. The watchdog-delay test
+# needs honest wall-clock to verify behavior.
+_REAL_SLEEP = time.sleep
+_REAL_MONOTONIC = time.monotonic
+
 
 def test_find_free_port_returns_valid_port():
     port = _find_free_port()
@@ -118,19 +124,33 @@ def test_parent_watchdog_stays_quiet_while_parent_alive():
 
 
 def test_parent_watchdog_honors_initial_delay():
-    """During the initial delay no probe happens, so death is reported late."""
+    """The watchdog respects initial_delay_s before the first probe.
+
+    The autouse `_no_sleep` fixture in conftest replaces ``time.sleep``
+    with a no-op for the whole suite (retry/backoff tests would
+    otherwise be slow). We need real sleep here, so we capture the
+    original before the fixture stomped it and pass it in via a
+    dedicated parameter rather than fight the autouse fixture. This
+    keeps the fast suite fast and the delay test honest.
+    """
     fired = threading.Event()
+    delay_s = 0.2
 
     with patch("spotify_to_ytmusic.api.sidecar_server._is_alive", return_value=False):
+        start = _REAL_MONOTONIC()
         start_parent_watchdog(
             1234,
             poll_interval_s=0.01,
-            initial_delay_s=0.2,
+            initial_delay_s=delay_s,
             on_parent_death=fired.set,
+            sleep=_REAL_SLEEP,
         )
-        assert not fired.is_set()
-        # After the initial delay elapses the first probe runs and fires.
-        assert fired.wait(timeout=1.0)
+        assert fired.wait(timeout=2.0), "watchdog never fired"
+        elapsed = _REAL_MONOTONIC() - start
+
+    assert elapsed >= delay_s * 0.5, (
+        f"watchdog fired in {elapsed:.3f}s, expected at least ~{delay_s}s"
+    )
 
 
 def test_is_alive_for_current_process():

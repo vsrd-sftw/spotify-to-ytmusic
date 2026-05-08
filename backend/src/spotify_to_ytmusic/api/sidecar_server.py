@@ -65,10 +65,15 @@ def _is_alive(pid: int) -> bool:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    except (OSError, ValueError, OverflowError):
-        # POSIX: EPERM means process exists but is owned by another user
-        # — still "alive" for our purposes.
+    except PermissionError:
+        # POSIX: EPERM means the process exists but is owned by another
+        # user — still "alive" for our purposes.
         return True
+    except (OSError, ValueError, OverflowError):
+        # Out-of-range or otherwise invalid PID — not a real running
+        # process. (On Linux, pid_t is signed 32-bit so values >2**31-1
+        # raise OverflowError before they reach the kernel.)
+        return False
     return True
 
 
@@ -78,30 +83,32 @@ def start_parent_watchdog(
     poll_interval_s: float = _PARENT_POLL_S,
     initial_delay_s: float = _PARENT_INITIAL_DELAY_S,
     on_parent_death=None,
+    sleep=None,
 ) -> threading.Thread | None:
     """Spawn a daemon thread that exits the process when ``parent_pid`` dies.
 
     Returns ``None`` (and does nothing) when the parent PID is not a real
     parent — eg. running under the CLI, where ``getppid()`` returns the
-    shell. ``on_parent_death`` is injectable for unit tests; it defaults
-    to ``os._exit(0)``.
+    shell. ``on_parent_death`` and ``sleep`` are injectable for unit
+    tests; they default to ``os._exit(0)`` and ``time.sleep``.
     """
     if parent_pid <= 1:
         return None
     callback = on_parent_death or (lambda: os._exit(0))
+    sleep_fn = sleep or time.sleep
 
     print(f"[watchdog] parent_pid={parent_pid}", file=sys.stderr, flush=True)
 
     def _watch() -> None:
         if initial_delay_s > 0:
-            time.sleep(initial_delay_s)
+            sleep_fn(initial_delay_s)
         while True:
             if not _is_alive(parent_pid):
                 print(f"[watchdog] parent_pid={parent_pid} is gone — exiting",
                       file=sys.stderr, flush=True)
                 callback()
                 return
-            time.sleep(poll_interval_s)
+            sleep_fn(poll_interval_s)
 
     thread = threading.Thread(target=_watch, name="parent-watchdog", daemon=True)
     thread.start()
