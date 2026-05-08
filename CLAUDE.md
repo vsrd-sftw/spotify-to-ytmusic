@@ -126,12 +126,25 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
 - **Sidecar cleanup on exit.** The `CommandChild` is parked in a
   module-level `OnceLock<Mutex<Option<CommandChild>>>` (NOT in
   `app.manage()`), because Tauri may drop managed state before
-  `RunEvent::Exit` fires. Cleanup is hooked on three events —
-  `RunEvent::ExitRequested`, `RunEvent::Exit`, and
-  `WindowEvent::Destroyed` — and is idempotent via `Option::take()`.
-  The sidecar also runs a daemon thread that polls its parent PID and
-  self-terminates within ~2 s if Tauri crashes; without that watchdog,
-  a hard kill of the host would orphan `spotify-to-ytmusic-server.exe`.
+  `RunEvent::Exit` fires. Cleanup is hooked on `RunEvent::ExitRequested`
+  and `RunEvent::Exit` and is idempotent via `Option::take()`.
+  `WindowEvent::Destroyed` was tried but removed — it could fire during
+  WebView2 startup transitions on some Windows machines and prematurely
+  kill the sidecar. The sidecar also runs a daemon thread that, after
+  a 5 s startup grace, polls its parent PID and self-terminates within
+  ~2 s if Tauri crashes. On Windows the parent-alive probe uses
+  `OpenProcess` + `GetExitCodeProcess` via ctypes — `os.kill(pid, 0)`
+  reports dead processes via `OSError`, NOT `ProcessLookupError`, so
+  the POSIX pattern would treat dead parents as alive.
+- **`pnpm tauri build` does NOT rebuild the sidecar.** Run
+  `python backend/scripts/build_sidecar.py` first; the script now
+  refuses to copy a sidecar binary smaller than 1 MB, but bundling an
+  outdated binary is silent. Always rebuild the sidecar after touching
+  any backend code that ships in the desktop app.
+- **Tauri startup failures pop a native dialog.** `lib.rs` replaces
+  `expect()` on `Builder::build()` with a `match` that logs to stderr,
+  shows `MessageBoxW` with the error, and exits cleanly. This converts
+  silent "blank window then close" launches into actionable bug reports.
 - **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
   (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
   subdirectory). The script copies it to `binaries/spotify-to-ytmusic-server-{target-triple}.exe`.

@@ -73,8 +73,22 @@ def main() -> None:
         sys.exit(1)
 
     shutil.copy2(source, dest)
+    size_bytes = dest.stat().st_size
     print(f"Sidecar binary written to {dest}")
-    print(f"Size: {dest.stat().st_size / (1024 * 1024):.1f} MB")
+    print(f"Size: {size_bytes / (1024 * 1024):.1f} MB")
+
+    # Defense for #98 follow-up: tauri build does NOT regenerate the sidecar;
+    # if the file at this path is a 0-byte placeholder (or a tiny dummy), the
+    # MSI ships a non-runnable exe and the desktop app crashes on launch with
+    # no useful feedback. Fail loudly instead.
+    MIN_SIZE_BYTES = 1_000_000
+    if size_bytes < MIN_SIZE_BYTES:
+        print(
+            f"ERROR: sidecar binary is suspiciously small ({size_bytes} bytes). "
+            f"Expected >{MIN_SIZE_BYTES} bytes. Refusing to ship a broken bundle.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
 
 if __name__ == "__main__":

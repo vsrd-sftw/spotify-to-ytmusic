@@ -1,7 +1,7 @@
 use std::sync::{Mutex, OnceLock};
 
 use serde::Serialize;
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{Manager, RunEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -104,7 +104,7 @@ fn kill_sidecar(reason: &str) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = match tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -120,24 +120,58 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![get_server_port, proxy_request])
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|_app_handle, event| match event {
-            // ExitRequested fires before Tauri begins tearing down. Cleanup
-            // here covers the normal "user clicks X" path even if Exit is
-            // suppressed downstream.
-            RunEvent::ExitRequested { .. } => kill_sidecar("ExitRequested"),
-            // Final guard — kept for the case where ExitRequested is bypassed
-            // (eg. tray-driven exits in future iterations).
-            RunEvent::Exit => kill_sidecar("Exit"),
-            // Best-effort: if the OS destroys the window without going
-            // through ExitRequested, still kill the sidecar so it doesn't
-            // outlive the UI.
-            RunEvent::WindowEvent {
-                event: WindowEvent::Destroyed,
-                ..
-            } => kill_sidecar("WindowDestroyed"),
-            _ => {}
-        });
+    {
+        Ok(app) => app,
+        Err(e) => {
+            // Build/setup failed — usually because the sidecar didn't start.
+            // Log a clear stderr trail (visible when launched from cmd.exe)
+            // and surface a native dialog so the user sees the cause instead
+            // of a silent close.
+            let msg = format!("Tauri failed to start: {e}");
+            eprintln!("[startup] {msg}");
+            kill_sidecar("StartupFailure");
+            show_startup_error(&msg);
+            std::process::exit(1);
+        }
+    };
+
+    app.run(|_app_handle, event| match event {
+        // ExitRequested fires before Tauri begins tearing down. Cleanup
+        // here covers the normal "user clicks X" path even if Exit is
+        // suppressed downstream.
+        RunEvent::ExitRequested { .. } => kill_sidecar("ExitRequested"),
+        // Final guard — kept for the case where ExitRequested is bypassed
+        // (eg. tray-driven exits in future iterations).
+        RunEvent::Exit => kill_sidecar("Exit"),
+        _ => {}
+    });
+}
+
+#[cfg(target_os = "windows")]
+fn show_startup_error(message: &str) {
+    use std::ffi::OsStr;
+    use std::iter::once;
+    use std::os::windows::ffi::OsStrExt;
+
+    extern "system" {
+        fn MessageBoxW(hwnd: usize, text: *const u16, caption: *const u16, kind: u32) -> i32;
+    }
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(once(0)).collect()
+    }
+
+    let text = to_wide(message);
+    let caption = to_wide("Spotify to YT Music — startup error");
+    // MB_OK | MB_ICONERROR
+    unsafe {
+        MessageBoxW(0, text.as_ptr(), caption.as_ptr(), 0x00000010);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn show_startup_error(_message: &str) {
+    // Other platforms: stderr-only for now. Release builds target Windows.
 }
 
 async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error::Error>> {
