@@ -102,7 +102,7 @@ async def test_auth_ytmusic_missing_x_goog_authuser(client):
         "/api/auth/ytmusic",
         json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 400
     data = resp.json()
     assert "x-goog-authuser" in data["message"].lower()
 
@@ -113,7 +113,7 @@ async def test_auth_ytmusic_missing_cookie(client):
         "/api/auth/ytmusic",
         json={"headers": "user-agent: Mozilla/5.0"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 400
     data = resp.json()
     assert "message" in data
 
@@ -124,7 +124,7 @@ async def test_auth_ytmusic_missing_user_agent(client):
         "/api/auth/ytmusic",
         json={"headers": "cookie: ABC"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 400
     data = resp.json()
     assert "message" in data
 
@@ -135,9 +135,58 @@ async def test_auth_ytmusic_empty_headers(client):
         "/api/auth/ytmusic",
         json={"headers": ""},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 400
     data = resp.json()
     assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_auth_ytmusic_setup_browser_user_error(client, tmp_path):
+    from ytmusicapi.exceptions import YTMusicUserError
+
+    browser_file = tmp_path / "browser.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.BROWSER_AUTH_FILE", str(browser_file)), \
+         patch("ytmusicapi.auth.browser.setup_browser", side_effect=YTMusicUserError("bad cookies")):
+        resp = await client.post(
+            "/api/auth/ytmusic",
+            json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0\nx-goog-authuser: 1"},
+        )
+        assert resp.status_code == 400
+        assert "bad cookies" in resp.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_auth_ytmusic_setup_browser_unexpected_error(client, tmp_path):
+    browser_file = tmp_path / "browser.json"
+    with patch("spotify_to_ytmusic.api.routes.auth.BROWSER_AUTH_FILE", str(browser_file)), \
+         patch("ytmusicapi.auth.browser.setup_browser", side_effect=RuntimeError("disk full")):
+        resp = await client.post(
+            "/api/auth/ytmusic",
+            json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0\nx-goog-authuser: 1"},
+        )
+        assert resp.status_code == 500
+        assert "disk full" in resp.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_auth_ytmusic_setup_browser_timeout(client, tmp_path):
+    """If setup_browser exceeds the wait_for timeout, the handler returns 504."""
+    import asyncio as _asyncio
+
+    browser_file = tmp_path / "browser.json"
+
+    async def fake_wait_for(*_args, **_kwargs):
+        raise _asyncio.TimeoutError()
+
+    with patch("spotify_to_ytmusic.api.routes.auth.BROWSER_AUTH_FILE", str(browser_file)), \
+         patch("ytmusicapi.auth.browser.setup_browser"), \
+         patch("spotify_to_ytmusic.api.routes.auth.asyncio.wait_for", side_effect=fake_wait_for):
+        resp = await client.post(
+            "/api/auth/ytmusic",
+            json={"headers": "cookie: ABC\nuser-agent: Mozilla/5.0\nx-goog-authuser: 1"},
+        )
+    assert resp.status_code == 504, f"expected 504, got {resp.status_code} body={resp.text!r}"
+    assert "tardando demasiado" in resp.json()["message"].lower()
 
 
 @pytest.mark.asyncio
