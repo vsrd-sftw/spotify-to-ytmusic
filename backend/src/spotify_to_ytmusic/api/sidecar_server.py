@@ -7,6 +7,8 @@ import logging
 import os
 import socket
 import sys
+import threading
+import time
 
 from dotenv import load_dotenv
 
@@ -19,6 +21,98 @@ load_persisted_credentials()
 logging.getLogger("spotipy.client").setLevel(logging.CRITICAL)
 
 import uvicorn
+
+# Parent-watchdog tunables. Defense in depth for #98: if the Tauri host
+# crashes or fails to fire its cleanup hooks, the sidecar self-terminates
+# within at most _PARENT_POLL_S of the parent's death. We delay the first
+# poll so PyInstaller bootstrap and any transient parent-process state
+# settle before we start checking.
+_PARENT_POLL_S = 2.0
+_PARENT_INITIAL_DELAY_S = 5.0
+
+
+def _is_alive_windows(pid: int) -> bool:
+    """Probe a PID via Win32 OpenProcess + GetExitCodeProcess."""
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(
+        PROCESS_QUERY_LIMITED_INFORMATION, False, wintypes.DWORD(pid)
+    )
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+        if not ok:
+            return False
+        return exit_code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _is_alive(pid: int) -> bool:
+    if os.name == "nt":
+        try:
+            return _is_alive_windows(pid)
+        except (OSError, ValueError, OverflowError):
+            return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # POSIX: EPERM means the process exists but is owned by another
+        # user — still "alive" for our purposes.
+        return True
+    except (OSError, ValueError, OverflowError):
+        # Out-of-range or otherwise invalid PID — not a real running
+        # process. (On Linux, pid_t is signed 32-bit so values >2**31-1
+        # raise OverflowError before they reach the kernel.)
+        return False
+    return True
+
+
+def start_parent_watchdog(
+    parent_pid: int,
+    *,
+    poll_interval_s: float = _PARENT_POLL_S,
+    initial_delay_s: float = _PARENT_INITIAL_DELAY_S,
+    on_parent_death=None,
+    sleep=None,
+) -> threading.Thread | None:
+    """Spawn a daemon thread that exits the process when ``parent_pid`` dies.
+
+    Returns ``None`` (and does nothing) when the parent PID is not a real
+    parent — eg. running under the CLI, where ``getppid()`` returns the
+    shell. ``on_parent_death`` and ``sleep`` are injectable for unit
+    tests; they default to ``os._exit(0)`` and ``time.sleep``.
+    """
+    if parent_pid <= 1:
+        return None
+    callback = on_parent_death or (lambda: os._exit(0))
+    sleep_fn = sleep or time.sleep
+
+    print(f"[watchdog] parent_pid={parent_pid}", file=sys.stderr, flush=True)
+
+    def _watch() -> None:
+        if initial_delay_s > 0:
+            sleep_fn(initial_delay_s)
+        while True:
+            if not _is_alive(parent_pid):
+                print(f"[watchdog] parent_pid={parent_pid} is gone — exiting",
+                      file=sys.stderr, flush=True)
+                callback()
+                return
+            sleep_fn(poll_interval_s)
+
+    thread = threading.Thread(target=_watch, name="parent-watchdog", daemon=True)
+    thread.start()
+    return thread
 
 
 def _find_free_port() -> int:
@@ -39,6 +133,17 @@ def main() -> None:
     else:
         port = 8000
 
+    # Optional argv[2]: PID of the real host (Tauri). Passed explicitly
+    # because os.getppid() under PyInstaller --onefile returns the bootstrap
+    # launcher's PID, not the host's, so a pure getppid() watchdog can't see
+    # the host die (#98).
+    host_pid: int | None = None
+    if len(sys.argv) > 2:
+        try:
+            host_pid = int(sys.argv[2])
+        except ValueError:
+            print(f"Invalid host PID: {sys.argv[2]}", file=sys.stderr)
+
     if port == 0:
         port = _find_free_port()
 
@@ -56,6 +161,8 @@ def main() -> None:
 
     config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
+
+    start_parent_watchdog(host_pid if host_pid is not None else os.getppid())
 
     print(f"SERVER_LISTENING port={port}", flush=True)
     server.run()

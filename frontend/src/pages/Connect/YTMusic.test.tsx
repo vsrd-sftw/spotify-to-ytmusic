@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
 import { ToastContainer, ToastProvider } from '@/components/ui/Toast';
 import { server } from '@/test/msw/server';
 import { ytmusicAuthErrorHandler } from '@/test/msw/handlers';
@@ -97,5 +98,42 @@ describe('YTMusicConnect', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/youtube music conectado/i);
     });
+  });
+
+  it('surfaces 400 message body as a FieldError', async () => {
+    server.use(
+      http.post('*/api/auth/ytmusic', () =>
+        HttpResponse.json(
+          { message: 'Falta el header x-goog-authuser. Copia los headers de /browse.' },
+          { status: 400 },
+        ),
+      ),
+    );
+    renderComponent();
+    fireEvent.change(screen.getByLabelText(/headers del navegador/i), {
+      target: { value: VALID_HEADERS },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /conectar con youtube music/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/x-goog-authuser/i);
+    });
+    expect(screen.getByRole('button', { name: /conectar con youtube music/i })).toBeEnabled();
+  });
+
+  it('treats a 200 with {message} as an error (defense-in-depth)', async () => {
+    server.use(
+      http.post('*/api/auth/ytmusic', () =>
+        HttpResponse.json({ message: 'Cookie inválida.' }, { status: 200 }),
+      ),
+    );
+    renderComponent();
+    fireEvent.change(screen.getByLabelText(/headers del navegador/i), {
+      target: { value: VALID_HEADERS },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /conectar con youtube music/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/cookie inválida/i);
+    });
+    expect(screen.getByRole('button', { name: /conectar con youtube music/i })).toBeEnabled();
   });
 });

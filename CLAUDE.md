@@ -114,6 +114,14 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   thread is never blocked during HTTP. `timeoutMs` from `http.ts` is
   propagated via `Promise.race` + `AbortController` (the Rust side also
   has `timeout_read(30s)` as a fallback).
+- **`proxy_request` must NOT collapse 4xx/5xx into `Err`.** `ureq` 2.x
+  returns `Err(ureq::Error::Status(code, response))` for every non-2xx
+  status. The Rust side must match that variant and return a normal
+  `ProxyResponse { status, body }` with the JSON payload preserved —
+  otherwise the frontend's `HttpError` path never fires, error toasts
+  never appear, and the user sees a button stuck in `submitting`. Only
+  `ureq::Error::Transport` (no HTTP response at all) should propagate
+  as `Err` to the JS side.
 - **Sidecar port is fixed at 53000** (outside Windows ephemeral range
   49152-65535). Using a port inside that range causes `WinError 10013`
   (WSAEACCES). The OAuth redirect URI must match: register
@@ -123,11 +131,45 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   sidecar reads this env var in `config.py`. Without it, the sidecar
   defaults to `./data` relative to its CWD (somewhere in Program Files,
   unwritable). Credentials, cache, and reports are stored here.
-- **Sidecar cleanup on exit.** The `child` process handle is stored in
-  `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback
-  with `eprintln!` logging at every failure point. `kill()` calls
-  `TerminateProcess` on Windows. Don't spawn the child without storing
-  a reference to kill it.
+- **Sidecar cleanup on exit.** Three layered defenses, in order of
+  reliability:
+  1. **Win32 Job Object** ([src-tauri/src/job.rs](frontend/src-tauri/src/job.rs)).
+     At startup, `lib.rs` creates a job with
+     `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and assigns the sidecar's PID
+     after spawn. When the host exits — cleanly, via crash, or via Task
+     Manager — the OS itself terminates every process in the job. This
+     is the only mechanism that reliably handles the PyInstaller
+     `--onefile` bootstrap, which leaves a zombie launcher process if
+     the runtime is killed via `TerminateProcess` alone. Requires
+     `windows-sys` features: `Win32_Foundation`, `Win32_Security`,
+     `Win32_System_JobObjects`, `Win32_System_Threading`.
+  2. **`CommandChild::kill()`** on `RunEvent::ExitRequested` and
+     `RunEvent::Exit`. The `CommandChild` is parked in a module-level
+     `OnceLock<Mutex<Option<CommandChild>>>` (NOT in `app.manage()`),
+     because Tauri may drop managed state before `RunEvent::Exit`
+     fires. Cleanup is idempotent via `Option::take()`.
+     `WindowEvent::Destroyed` was tried but removed — it could fire
+     during WebView2 startup transitions on some Windows machines and
+     prematurely kill the sidecar.
+  3. **Parent-watchdog inside the sidecar.** Daemon thread that polls
+     the host PID every 2 s (after a 5 s startup grace) and self-exits
+     via `os._exit(0)` if it disappears. The host PID is passed
+     explicitly as `argv[2]` because `os.getppid()` under PyInstaller
+     `--onefile` returns the bootstrap launcher's PID, not Tauri's, so
+     a `getppid()`-only watchdog would miss host crashes. On Windows
+     the probe uses `OpenProcess` + `GetExitCodeProcess` via ctypes —
+     `os.kill(pid, 0)` reports dead processes via `OSError`, NOT
+     `ProcessLookupError`, so the POSIX pattern would treat dead
+     parents as alive.
+- **`pnpm tauri build` does NOT rebuild the sidecar.** Run
+  `python backend/scripts/build_sidecar.py` first; the script now
+  refuses to copy a sidecar binary smaller than 1 MB, but bundling an
+  outdated binary is silent. Always rebuild the sidecar after touching
+  any backend code that ships in the desktop app.
+- **Tauri startup failures pop a native dialog.** `lib.rs` replaces
+  `expect()` on `Builder::build()` with a `match` that logs to stderr,
+  shows `MessageBoxW` with the error, and exits cleanly. This converts
+  silent "blank window then close" launches into actionable bug reports.
 - **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
   (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
   subdirectory). The script copies it to `binaries/spotify-to-ytmusic-server-{target-triple}.exe`.
@@ -135,6 +177,21 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   `xmlrpc`.** `spotipy` → `redis` → `importlib.metadata` needs `email`;
   `spotipy.oauth2` needs `html`. Excluding these causes
   `ModuleNotFoundError` at sidecar startup.
+- **PyInstaller spec must include `collect_data_files("ytmusicapi")`.**
+  `ytmusicapi.YTMusic.__init__` loads gettext `.mo` translation files
+  from `ytmusicapi/locales/<lang>/LC_MESSAGES/base.mo`. Without those
+  data files in the bundle, every call that constructs `YTMusicClient`
+  (notably `_check_ytmusic` in `health.py`, hit on every UI render)
+  throws `FileNotFoundError: No translation file found for domain:
+  'base'`. Symptom: `/api/health` returns `ytmusic:false` with a valid
+  `browser.json`, the badge stays "Desconectado", and migrations fail
+  with no clear error.
+- **`_check_ytmusic` writes a traceback log on failure.** Silent
+  failures here used to leave the UI showing `ytmusic:false` with no
+  diagnostic trail. The traceback is appended to
+  `<data_dir>/ytmusic_health.log`. If a regression makes the badge
+  stuck on "Desconectado" with valid headers, that's the first place
+  to look.
 - **Tauri custom-protocol is DISABLED** (`default = []` in Cargo.toml).
   Without it the webview uses `http://127.0.0.1:{port}` as origin, which
   would allow `fetch` to localhost (but we proxy through IPC anyway).
@@ -149,12 +206,16 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   closes the browser tab (the callback page has a close button) and
   returns to the Tauri app.
 - **YT Music auth (`POST /api/auth/ytmusic`)** requires the `x-goog-authuser`
-  header in addition to `cookie` and `user-agent`. The endpoint validates
-  all three before calling `ytmusicapi.setup_browser()` and wraps the call
-  in `try`/`except` to surface `YTMusicUserError` as a validation message.
-  `setup_browser()` in ytmusicapi >= 1.10 is a local-only operation (no
-  network calls). The frontend reads errors from both `body.message` and
-  `body.detail` (FastAPI fallback).
+  header in addition to `cookie` and `user-agent`. The endpoint returns
+  proper HTTP status codes (`400` for validation/`YTMusicUserError`,
+  `504` if `setup_browser` exceeds `YTMUSIC_SETUP_TIMEOUT_S`, `500` for
+  unexpected errors); the body is always `{message: str}`. `setup_browser`
+  is dispatched through `loop.run_in_executor` wrapped in
+  `asyncio.wait_for` so a hung call cannot stall the response — the
+  frontend always sees success or an error within seconds. The frontend
+  reads errors from `body.message` / `body.detail`, **and** also treats a
+  `200` response that contains `{message: ...}` as an error (defense
+  against older builds that returned `ErrorResponse` with status 200).
 - **Credenciales Spotify**: se guardan via UI en `spotify_credentials.json`.
   El `.env` solo sirve para la CLI.
 

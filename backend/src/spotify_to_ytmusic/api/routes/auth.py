@@ -1,8 +1,9 @@
 """Authentication routes: Spotify OAuth and YT Music headers."""
+import asyncio
 import secrets
 
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from spotify_to_ytmusic.api.models import AuthUrlResponse, ErrorResponse, OkResponse
 from spotify_to_ytmusic.api.state import state_store
@@ -13,6 +14,15 @@ from spotify_to_ytmusic.core.config import (
 )
 
 router = APIRouter(prefix="/api")
+
+# setup_browser is supposed to be local-only in ytmusicapi >= 1.10, but in
+# packaged builds we have observed it hanging (#94, #99). Wall-clock cap so
+# the frontend always gets a response.
+YTMUSIC_SETUP_TIMEOUT_S = 8.0
+
+
+def _error(status: int, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content=ErrorResponse(message=message).model_dump(by_alias=True))
 
 
 def _get_spotify_oauth(state: str | None = None, redirect_uri: str | None = None):
@@ -109,33 +119,46 @@ def _callback_html(title: str, message: str) -> str:
 
 
 @router.post("/auth/ytmusic")
-async def auth_ytmusic(body: dict) -> OkResponse | ErrorResponse:
+async def auth_ytmusic(body: dict):
     headers = body.get("headers", "")
     if not isinstance(headers, str) or not headers.strip():
-        return ErrorResponse(message="Pega los headers del navegador antes de continuar.")
+        return _error(400, "Pega los headers del navegador antes de continuar.")
     from ytmusicapi.auth.browser import setup_browser
     from ytmusicapi.exceptions import YTMusicUserError
     from spotify_to_ytmusic.core.headers_parser import normalize_headers
 
     normalized = normalize_headers(headers)
     if not normalized.strip():
-        return ErrorResponse(message="No se pudieron parsear los headers. Pega el bloque entero de request headers.")
+        return _error(400, "No se pudieron parsear los headers. Pega el bloque entero de request headers.")
     lower = normalized.lower()
     if "cookie:" not in lower or "user-agent:" not in lower:
-        return ErrorResponse(
-            message="Los headers deben incluir al menos cookie: y user-agent:."
-        )
+        return _error(400, "Los headers deben incluir al menos cookie: y user-agent:.")
     if "x-goog-authuser:" not in lower:
-        return ErrorResponse(
-            message='Falta el header x-goog-authuser. Copia los headers de una petición /browse '
-                    'en la pestaña Network de DevTools (F12) y asegúrate de incluir este header.'
+        return _error(
+            400,
+            'Falta el header x-goog-authuser. Copia los headers de una petición /browse '
+            'en la pestaña Network de DevTools (F12) y asegúrate de incluir este header.',
         )
+
+    loop = asyncio.get_running_loop()
     try:
-        setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized)
+        await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: setup_browser(filepath=BROWSER_AUTH_FILE, headers_raw=normalized),
+            ),
+            timeout=YTMUSIC_SETUP_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        return _error(
+            504,
+            "La conexión con YouTube Music está tardando demasiado. Vuelve a copiar los headers "
+            "desde una petición /browse reciente y prueba de nuevo.",
+        )
     except YTMusicUserError as e:
-        return ErrorResponse(message=f"Error en los headers: {e}")
+        return _error(400, f"Error en los headers: {e}")
     except Exception as e:
-        return ErrorResponse(message=f"No se pudo conectar con YouTube Music: {e}")
+        return _error(500, f"No se pudo conectar con YouTube Music: {e}")
     return OkResponse(ok=True)
 
 
