@@ -68,6 +68,7 @@ def test_parent_watchdog_fires_when_parent_dies():
         thread = start_parent_watchdog(
             1234,
             poll_interval_s=0.01,
+            initial_delay_s=0.0,
             on_parent_death=fired.set,
         )
         assert thread is not None
@@ -82,6 +83,7 @@ def test_parent_watchdog_stays_quiet_while_parent_alive():
         thread = start_parent_watchdog(
             1234,
             poll_interval_s=0.01,
+            initial_delay_s=0.0,
             on_parent_death=fired.set,
         )
         assert thread is not None
@@ -89,8 +91,30 @@ def test_parent_watchdog_stays_quiet_while_parent_alive():
         assert not fired.is_set()
 
 
+def test_parent_watchdog_honors_initial_delay():
+    """During the initial delay no probe happens, so death is reported late."""
+    fired = threading.Event()
+
+    with patch("spotify_to_ytmusic.api.sidecar_server._is_alive", return_value=False):
+        start_parent_watchdog(
+            1234,
+            poll_interval_s=0.01,
+            initial_delay_s=0.2,
+            on_parent_death=fired.set,
+        )
+        assert not fired.is_set()
+        # After the initial delay elapses the first probe runs and fires.
+        assert fired.wait(timeout=1.0)
+
+
 def test_is_alive_for_current_process():
     """Sanity check: the test runner's own PID is alive."""
     import os as _os
 
     assert _is_alive(_os.getpid())
+
+
+def test_is_alive_returns_false_for_unused_pid():
+    """A wildly-out-of-range PID should be reported as dead, not alive."""
+    # 4_294_967_294 is just under DWORD max; should never be a valid PID.
+    assert _is_alive(4_294_967_294) is False

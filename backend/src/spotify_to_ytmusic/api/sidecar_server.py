@@ -24,18 +24,50 @@ import uvicorn
 
 # Parent-watchdog tunables. Defense in depth for #98: if the Tauri host
 # crashes or fails to fire its cleanup hooks, the sidecar self-terminates
-# within at most _PARENT_POLL_S of the parent's death.
+# within at most _PARENT_POLL_S of the parent's death. We delay the first
+# poll so PyInstaller bootstrap and any transient parent-process state
+# settle before we start checking.
 _PARENT_POLL_S = 2.0
+_PARENT_INITIAL_DELAY_S = 5.0
+
+
+def _is_alive_windows(pid: int) -> bool:
+    """Probe a PID via Win32 OpenProcess + GetExitCodeProcess."""
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(
+        PROCESS_QUERY_LIMITED_INFORMATION, False, wintypes.DWORD(pid)
+    )
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+        if not ok:
+            return False
+        return exit_code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _is_alive(pid: int) -> bool:
+    if os.name == "nt":
+        try:
+            return _is_alive_windows(pid)
+        except (OSError, ValueError, OverflowError):
+            return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    except OSError:
-        # On Windows, EPERM means the process exists but we can't signal it.
-        # On POSIX, EPERM means the same. Either way: alive.
+    except (OSError, ValueError, OverflowError):
+        # POSIX: EPERM means process exists but is owned by another user
+        # — still "alive" for our purposes.
         return True
     return True
 
@@ -44,6 +76,7 @@ def start_parent_watchdog(
     parent_pid: int,
     *,
     poll_interval_s: float = _PARENT_POLL_S,
+    initial_delay_s: float = _PARENT_INITIAL_DELAY_S,
     on_parent_death=None,
 ) -> threading.Thread | None:
     """Spawn a daemon thread that exits the process when ``parent_pid`` dies.
@@ -57,9 +90,15 @@ def start_parent_watchdog(
         return None
     callback = on_parent_death or (lambda: os._exit(0))
 
+    print(f"[watchdog] parent_pid={parent_pid}", file=sys.stderr, flush=True)
+
     def _watch() -> None:
+        if initial_delay_s > 0:
+            time.sleep(initial_delay_s)
         while True:
             if not _is_alive(parent_pid):
+                print(f"[watchdog] parent_pid={parent_pid} is gone — exiting",
+                      file=sys.stderr, flush=True)
                 callback()
                 return
             time.sleep(poll_interval_s)
