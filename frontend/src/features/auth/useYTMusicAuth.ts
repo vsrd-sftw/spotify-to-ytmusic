@@ -19,6 +19,14 @@ function extractErrorMessage(err: HttpError): string | null {
   return null;
 }
 
+function extractMessageFromOk(body: unknown): string | null {
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const msg = (body as Record<string, unknown>).message;
+    if (typeof msg === 'string' && msg.trim()) return msg;
+  }
+  return null;
+}
+
 export function useYTMusicAuth(): UseYTMusicAuthResult {
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,7 +45,16 @@ export function useYTMusicAuth(): UseYTMusicAuthResult {
 
       http
         .post('/auth/ytmusic', { headers }, { timeoutMs: 30_000 })
-        .then(() => {
+        .then((body: unknown) => {
+          // Defense-in-depth: an older sidecar build may return 200 with
+          // {message: "..."} instead of a 4xx. Treat that as an error so
+          // the user sees the real reason instead of a fake success toast.
+          const errorMessage = extractMessageFromOk(body);
+          if (errorMessage) {
+            setState('error');
+            setErrorMessage(errorMessage);
+            return;
+          }
           setState('success');
           invalidateHealth();
           toast.success('YouTube Music conectado');
