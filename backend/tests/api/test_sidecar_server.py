@@ -47,6 +47,32 @@ def test_main_prints_server_listening(capfd):
     assert "SERVER_LISTENING port=54321" in captured.out
 
 
+def test_main_passes_explicit_host_pid_to_watchdog():
+    """argv[2] (Tauri host PID) overrides os.getppid()."""
+    from spotify_to_ytmusic.api.sidecar_server import main
+
+    with patch("sys.argv", ["sidecar_server", "0", "9999"]), \
+         patch("spotify_to_ytmusic.api.sidecar_server.uvicorn.Server.run", return_value=None), \
+         patch("spotify_to_ytmusic.api.sidecar_server._find_free_port", return_value=1), \
+         patch("spotify_to_ytmusic.api.sidecar_server.start_parent_watchdog") as wd, \
+         patch("os.getppid", return_value=11111):
+        main()
+    wd.assert_called_once_with(9999)
+
+
+def test_main_falls_back_to_getppid_without_argv2():
+    """No argv[2] → watch os.getppid() (CLI / legacy spawners)."""
+    from spotify_to_ytmusic.api.sidecar_server import main
+
+    with patch("sys.argv", ["sidecar_server", "0"]), \
+         patch("spotify_to_ytmusic.api.sidecar_server.uvicorn.Server.run", return_value=None), \
+         patch("spotify_to_ytmusic.api.sidecar_server._find_free_port", return_value=1), \
+         patch("spotify_to_ytmusic.api.sidecar_server.start_parent_watchdog") as wd, \
+         patch("os.getppid", return_value=11111):
+        main()
+    wd.assert_called_once_with(11111)
+
+
 def test_parent_watchdog_skips_when_pid_is_root_or_init():
     """Init/root PIDs (<=1) are sentinels for "no real parent" — don't watch."""
     fired = threading.Event()

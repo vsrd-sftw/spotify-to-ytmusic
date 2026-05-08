@@ -126,6 +126,17 @@ def main() -> None:
     else:
         port = 8000
 
+    # Optional argv[2]: PID of the real host (Tauri). Passed explicitly
+    # because os.getppid() under PyInstaller --onefile returns the bootstrap
+    # launcher's PID, not the host's, so a pure getppid() watchdog can't see
+    # the host die (#98).
+    host_pid: int | None = None
+    if len(sys.argv) > 2:
+        try:
+            host_pid = int(sys.argv[2])
+        except ValueError:
+            print(f"Invalid host PID: {sys.argv[2]}", file=sys.stderr)
+
     if port == 0:
         port = _find_free_port()
 
@@ -144,7 +155,7 @@ def main() -> None:
     config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
 
-    start_parent_watchdog(os.getppid())
+    start_parent_watchdog(host_pid if host_pid is not None else os.getppid())
 
     print(f"SERVER_LISTENING port={port}", flush=True)
     server.run()
