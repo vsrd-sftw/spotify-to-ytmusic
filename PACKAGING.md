@@ -24,13 +24,35 @@ The binary is written to `frontend/src-tauri/binaries/`.
 ### How it works
 
 1. The Tauri host spawns the sidecar with
-   `spotify-to-ytmusic-server-{target-triple} <port>`, where `<port>` is
-   `0` (pick a random free port).
-2. The sidecar starts a uvicorn HTTP server on `127.0.0.1:<port>` and
-   prints `SERVER_LISTENING port=<n>` to stdout.
-3. The Tauri host captures stdout, parses the port, and uses it to route
-   frontend requests.
-4. On app exit, the Tauri host kills the sidecar process.
+   `spotify-to-ytmusic-server-{target-triple} 53000 <host-pid>`. The
+   port is fixed at `53000` (outside the Windows ephemeral range, so
+   the OAuth redirect URI registered in the Spotify dashboard is
+   stable). The host PID is forwarded so the sidecar's parent-watchdog
+   can monitor the real Tauri process — `os.getppid()` under
+   PyInstaller `--onefile` returns the bootstrap launcher's PID, not
+   Tauri's, so a `getppid()`-only watchdog would miss host crashes.
+2. The sidecar starts a uvicorn HTTP server on `127.0.0.1:53000` and
+   prints `SERVER_LISTENING port=53000` to stdout.
+3. The Tauri host captures stdout, parses the port, and uses it to
+   route frontend requests through the IPC proxy
+   (`invoke('proxy_request')` → Rust `ureq`).
+4. **Sidecar cleanup on exit** uses three layered defenses:
+   1. **Win32 Job Object** with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+      (Windows only, [`src-tauri/src/job.rs`](frontend/src-tauri/src/job.rs)).
+      The sidecar PID is assigned to the job at spawn time; when the
+      host's last handle closes — clean exit, crash, or Task Manager
+      kill — the OS itself terminates every process in the job. This
+      is the only mechanism that reliably handles the PyInstaller
+      `--onefile` bootstrap, which can leave a zombie launcher process
+      otherwise.
+   2. **Explicit `CommandChild::kill()`** on `RunEvent::ExitRequested`
+      and `RunEvent::Exit`. Idempotent via `Option::take()` on a
+      module-level `OnceLock<Mutex<Option<CommandChild>>>` (parking
+      the handle in `app.manage()` was tried but raced with Tauri's
+      managed-state teardown).
+   3. **Parent-watchdog inside the sidecar.** Daemon thread that polls
+      the Tauri PID every 2 s (after a 5 s startup grace) and exits
+      via `os._exit(0)` if it disappears.
 
 ### Environment variables
 
@@ -44,6 +66,25 @@ The binary is written to `frontend/src-tauri/binaries/`.
 
 On Linux, the sidecar enforces `0o600` permissions on `.cache` and
 `browser.json` at startup.
+
+### PyInstaller data files
+
+The spec uses `collect_data_files("ytmusicapi")` to bundle the gettext
+`.mo` translation files under `ytmusicapi/locales/<lang>/LC_MESSAGES/`.
+Without those files, every `YTMusic()` construction throws
+`FileNotFoundError: No translation file found for domain: 'base'` at
+runtime, surfacing as `ytmusic:false` on `/api/health` even with a
+valid `browser.json`. If you add new dependencies that load data
+files (icons, locales, templates), make sure the spec collects them.
+
+### Diagnosing a stuck "Desconectado" badge
+
+`_check_ytmusic` in `health.py` writes the full traceback to
+`<data_dir>/ytmusic_health.log` whenever it fails. If the YT Music
+badge is stuck on "Desconectado" with valid headers, check that file
+first — it captures the underlying exception (missing data file,
+broken import, expired session) instead of leaving the failure
+silent.
 
 ### CI
 

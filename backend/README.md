@@ -234,6 +234,11 @@ Files written there:
   work for the playlist in flight. Delete the file to force a full
   re-search (e.g. if you suspect YT Music has added catalogue entries
   that were misses before).
+- `ytmusic_health.log` — Diagnostic traceback written by
+  `_check_ytmusic` whenever it fails to construct `YTMusicClient`. If
+  the desktop app shows the YT Music badge as "Desconectado" with
+  valid headers, this file holds the underlying exception. Safe to
+  delete; it's regenerated on the next failed health check.
 
 The whole `data/` directory is gitignored.
 

@@ -21,11 +21,13 @@ This is a monorepo:
   and the React frontend (`pnpm dev`) are fully functional. Connect your
   Spotify account, browse your library, select what to migrate, run a
   migration with live WebSocket progress, and browse or delete reports.
-- **Desktop app (Windows):** the Tauri 2 wrapper builds and installs
-  correctly. Spotify OAuth connects (port 53000). Some known issues remain:
-  YT Music auth doesn't work, library loading freezes the UI, and the OAuth
-  callback page has no return path. See [open issues labeled `desktop`]
-  (https://github.com/vsrd-sftw/spotify-to-ytmusic/issues?q=is%3Aopen+label%3Adesktop).
+- **Desktop app (Windows):** the Tauri 2 wrapper builds, installs, and
+  runs end-to-end. Spotify OAuth connects (port 53000), YT Music
+  authentication completes with browser-paste headers, library browsing
+  and migration both work, and the sidecar process is reliably cleaned
+  up on every exit path (clean close, host crash, Task Manager kill).
+  Open issues, if any, are tracked under
+  [label `desktop`](https://github.com/vsrd-sftw/spotify-to-ytmusic/issues?q=is%3Aopen+label%3Adesktop).
   CI produces `.msi` and `.exe` installers on every `v*` tag push.
   No Python installation required — the backend runs as a compiled onefile binary.
 
@@ -176,14 +178,6 @@ range). Register the following Redirect URI in your
 ```
 http://127.0.0.1:53000/api/auth/spotify/callback
 ```
-
-### Dev mode
-
-```bash
-cd frontend && pnpm tauri dev
-```
-
-Requires the FastAPI server running on `:8000` (`python -m spotify_to_ytmusic.api.server`).
 
 ### Dev mode
 
