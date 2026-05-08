@@ -3,14 +3,24 @@
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 here = Path(SPECPATH).resolve()
 src = here / "src"
+
+# ytmusicapi loads gettext .mo translation files at YTMusic() construction
+# time. Without these data files the sidecar throws
+# FileNotFoundError: No translation file found for domain: 'base'
+# the moment any code instantiates YTMusicClient — which the /health
+# endpoint does on every request, surfacing as ytmusic:false in the UI
+# even with a valid browser.json.
+ytmusicapi_data = collect_data_files("ytmusicapi")
 
 a = Analysis(
     [str(src / "spotify_to_ytmusic" / "api" / "sidecar_server.py")],
     pathex=[str(src)],
     binaries=[],
-    datas=[],
+    datas=ytmusicapi_data,
     hiddenimports=[
         "spotify_to_ytmusic",
         "spotify_to_ytmusic.api",

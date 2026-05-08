@@ -37,6 +37,18 @@ def _check_ytmusic() -> bool:
         YTMusicClient()
         return True
     except Exception:
+        # Silent failure here used to leave the UI showing ytmusic:false
+        # with no clue why (eg. PyInstaller missing data files for
+        # ytmusicapi locales). Trace to a log next to browser.json so the
+        # next regression is one Get-Content away from a fix.
+        import traceback
+        try:
+            log_path = Path(BROWSER_AUTH_FILE).parent / "ytmusic_health.log"
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(traceback.format_exc())
+                f.write("\n")
+        except Exception:
+            pass
         return False
 
 
