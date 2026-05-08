@@ -123,11 +123,15 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   sidecar reads this env var in `config.py`. Without it, the sidecar
   defaults to `./data` relative to its CWD (somewhere in Program Files,
   unwritable). Credentials, cache, and reports are stored here.
-- **Sidecar cleanup on exit.** The `child` process handle is stored in
-  `SidecarState` and killed via `RunEvent::Exit` in `.run()` callback
-  with `eprintln!` logging at every failure point. `kill()` calls
-  `TerminateProcess` on Windows. Don't spawn the child without storing
-  a reference to kill it.
+- **Sidecar cleanup on exit.** The `CommandChild` is parked in a
+  module-level `OnceLock<Mutex<Option<CommandChild>>>` (NOT in
+  `app.manage()`), because Tauri may drop managed state before
+  `RunEvent::Exit` fires. Cleanup is hooked on three events —
+  `RunEvent::ExitRequested`, `RunEvent::Exit`, and
+  `WindowEvent::Destroyed` — and is idempotent via `Option::take()`.
+  The sidecar also runs a daemon thread that polls its parent PID and
+  self-terminates within ~2 s if Tauri crashes; without that watchdog,
+  a hard kill of the host would orphan `spotify-to-ytmusic-server.exe`.
 - **`build_sidecar.py` copies a ONE-FILE binary.** The PyInstaller spec
   (`--onefile`) produces `dist/spotify-to-ytmusic-server.exe` directly (no
   subdirectory). The script copies it to `binaries/spotify-to-ytmusic-server-{target-triple}.exe`.
@@ -149,12 +153,16 @@ wraps `ytmusicapi` with retry/backoff. `TrackCache` persists
   closes the browser tab (the callback page has a close button) and
   returns to the Tauri app.
 - **YT Music auth (`POST /api/auth/ytmusic`)** requires the `x-goog-authuser`
-  header in addition to `cookie` and `user-agent`. The endpoint validates
-  all three before calling `ytmusicapi.setup_browser()` and wraps the call
-  in `try`/`except` to surface `YTMusicUserError` as a validation message.
-  `setup_browser()` in ytmusicapi >= 1.10 is a local-only operation (no
-  network calls). The frontend reads errors from both `body.message` and
-  `body.detail` (FastAPI fallback).
+  header in addition to `cookie` and `user-agent`. The endpoint returns
+  proper HTTP status codes (`400` for validation/`YTMusicUserError`,
+  `504` if `setup_browser` exceeds `YTMUSIC_SETUP_TIMEOUT_S`, `500` for
+  unexpected errors); the body is always `{message: str}`. `setup_browser`
+  is dispatched through `loop.run_in_executor` wrapped in
+  `asyncio.wait_for` so a hung call cannot stall the response — the
+  frontend always sees success or an error within seconds. The frontend
+  reads errors from `body.message` / `body.detail`, **and** also treats a
+  `200` response that contains `{message: ...}` as an error (defense
+  against older builds that returned `ErrorResponse` with status 200).
 - **Credenciales Spotify**: se guardan via UI en `spotify_credentials.json`.
   El `.env` solo sirve para la CLI.
 

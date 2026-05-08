@@ -1,7 +1,7 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use serde::Serialize;
-use tauri::Manager;
+use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -64,7 +64,6 @@ async fn proxy_request(
 
 struct SidecarState {
     port: u16,
-    child: Mutex<Option<CommandChild>>,
 }
 
 #[tauri::command]
@@ -72,16 +71,34 @@ fn get_server_port(state: tauri::State<SidecarState>) -> u16 {
     state.port
 }
 
-fn kill_sidecar(child: &mut Option<CommandChild>) {
-    if let Some(c) = child.take() {
-        eprintln!("[sidecar] killing sidecar process…");
-        if let Err(e) = c.kill() {
-            eprintln!("[sidecar] kill() failed: {e}");
-        } else {
-            eprintln!("[sidecar] kill() succeeded");
+// Sidecar process handle stored at module scope (not in Tauri's managed
+// state) so cleanup can run from any lifecycle event without racing with
+// Tauri dropping the State container before RunEvent::Exit fires (#98).
+fn sidecar_handle() -> &'static Mutex<Option<CommandChild>> {
+    static HANDLE: OnceLock<Mutex<Option<CommandChild>>> = OnceLock::new();
+    HANDLE.get_or_init(|| Mutex::new(None))
+}
+
+fn kill_sidecar(reason: &str) {
+    let taken = match sidecar_handle().lock() {
+        Ok(mut guard) => guard.take(),
+        Err(e) => {
+            eprintln!("[sidecar] mutex poisoned during {reason}: {e}");
+            return;
         }
-    } else {
-        eprintln!("[sidecar] no child to kill (already taken or never set)");
+    };
+    match taken {
+        Some(child) => {
+            eprintln!("[sidecar] killing sidecar process ({reason})…");
+            if let Err(e) = child.kill() {
+                eprintln!("[sidecar] kill() failed during {reason}: {e}");
+            } else {
+                eprintln!("[sidecar] kill() succeeded during {reason}");
+            }
+        }
+        None => {
+            // Already cleaned up by a previous lifecycle hook — idempotent.
+        }
     }
 }
 
@@ -97,28 +114,29 @@ pub fn run() {
                 tauri::async_runtime::block_on(spawn_sidecar(app.handle()))?
             };
 
-            if cfg!(debug_assertions) {
-                app.manage(SidecarState {
-                    port,
-                    child: Mutex::new(None),
-                });
-            }
+            app.manage(SidecarState { port });
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![get_server_port, proxy_request])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                match app_handle.try_state::<SidecarState>() {
-                    Some(state) => match state.child.lock() {
-                        Ok(mut child) => kill_sidecar(&mut child),
-                        Err(e) => eprintln!("[sidecar] mutex poisoned, cannot kill sidecar: {e}"),
-                    },
-                    None => eprintln!("[sidecar] SidecarState not found, cannot kill sidecar"),
-                }
-            }
+        .run(|_app_handle, event| match event {
+            // ExitRequested fires before Tauri begins tearing down. Cleanup
+            // here covers the normal "user clicks X" path even if Exit is
+            // suppressed downstream.
+            RunEvent::ExitRequested { .. } => kill_sidecar("ExitRequested"),
+            // Final guard — kept for the case where ExitRequested is bypassed
+            // (eg. tray-driven exits in future iterations).
+            RunEvent::Exit => kill_sidecar("Exit"),
+            // Best-effort: if the OS destroys the window without going
+            // through ExitRequested, still kill the sidecar so it doesn't
+            // outlive the UI.
+            RunEvent::WindowEvent {
+                event: WindowEvent::Destroyed,
+                ..
+            } => kill_sidecar("WindowDestroyed"),
+            _ => {}
         });
 }
 
@@ -159,10 +177,13 @@ async fn spawn_sidecar(app: &tauri::AppHandle) -> Result<u16, Box<dyn std::error
         }
     };
 
-    app.manage(SidecarState {
-        port,
-        child: Mutex::new(Some(child)),
-    });
+    // Park the child handle in the static container so every lifecycle
+    // hook can take ownership and kill it idempotently.
+    if let Ok(mut guard) = sidecar_handle().lock() {
+        *guard = Some(child);
+    } else {
+        eprintln!("[sidecar] failed to acquire static handle lock");
+    }
 
     Ok(port)
 }
